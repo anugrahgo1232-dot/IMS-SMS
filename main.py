@@ -67,6 +67,8 @@ from telegram import (
     Update,
     BotCommand,
     InputMediaPhoto,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -329,17 +331,12 @@ db = Database(DB_FILE)
 
 
 def _btn(text, *, cb=None, url=None, style=None):
-    d = {"text": text}
-    if cb is not None:
-        d["callback_data"] = cb
     if url is not None:
-        d["url"] = url
-    if style is not None:
-        d["style"] = style
-    return d
+        return InlineKeyboardButton(text, url=url)
+    return InlineKeyboardButton(text, callback_data=cb)
 
 def _markup(rows):
-    return {"inline_keyboard": rows}
+    return InlineKeyboardMarkup(rows)
 
 
 def get_country_info(number):
@@ -633,23 +630,22 @@ async def _send_photo_raw(bot, chat_id, photo, caption, parse_mode, markup):
             photo=photo,
             caption=caption,
             parse_mode=parse_mode,
-            api_kwargs={"reply_markup": markup} if markup else None,
+            reply_markup=markup,
         )
     except Exception:
         return await bot.send_message(
             chat_id=chat_id,
             text=caption,
             parse_mode=parse_mode,
-            api_kwargs={"reply_markup": markup} if markup else None,
+            reply_markup=markup,
         )
 
 
 async def _edit_raw(query, photo, caption, parse_mode, markup):
-    api_kw = {"reply_markup": markup} if markup else None
     try:
         await query.edit_message_media(
             media=InputMediaPhoto(media=photo, caption=caption, parse_mode=parse_mode),
-            api_kwargs=api_kw,
+            reply_markup=markup,
         )
         return
     except Exception:
@@ -658,7 +654,7 @@ async def _edit_raw(query, photo, caption, parse_mode, markup):
         await query.edit_message_caption(
             caption=caption,
             parse_mode=parse_mode,
-            api_kwargs=api_kw,
+            reply_markup=markup,
         )
         return
     except Exception:
@@ -667,7 +663,7 @@ async def _edit_raw(query, photo, caption, parse_mode, markup):
         await query.edit_message_text(
             text=caption,
             parse_mode=parse_mode,
-            api_kwargs=api_kw,
+            reply_markup=markup,
         )
     except Exception:
         pass
@@ -1161,7 +1157,7 @@ async def sms_worker(app):
                             photo=BANNER_URL,
                             caption=text_msg,
                             parse_mode=ParseMode.HTML,
-                            api_kwargs={"reply_markup": markup} if markup else None,
+                            reply_markup=markup,
                         )
 
                         otp_cache.add(h)
@@ -1981,7 +1977,7 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     photo=BANNER_URL,
                     caption=broadcast_msg,
                     parse_mode=ParseMode.HTML,
-                    api_kwargs={"reply_markup": broadcast_markup} if broadcast_markup else None,
+                    reply_markup=broadcast_markup,
                 )
                 success += 1
                 await asyncio.sleep(0.05)
@@ -1991,7 +1987,7 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                         chat_id=u["user_id"],
                         text=broadcast_msg,
                         parse_mode=ParseMode.HTML,
-                        api_kwargs={"reply_markup": broadcast_markup} if broadcast_markup else None,
+                        reply_markup=broadcast_markup,
                         disable_web_page_preview=True,
                     )
                     success += 1
@@ -2013,7 +2009,7 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     f"Total  : {len(all_users)}"
                 ),
                 parse_mode=ParseMode.HTML,
-                api_kwargs={"reply_markup": back_to_admin()},
+                reply_markup=back_to_admin(),
             )
         except Exception:
             pass
@@ -2133,7 +2129,7 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=waiting.message_id,
                 caption=result_text,
                 parse_mode=ParseMode.HTML,
-                api_kwargs={"reply_markup": back_markup},
+                reply_markup=back_markup,
             )
         except Exception:
             await send_with_banner(
