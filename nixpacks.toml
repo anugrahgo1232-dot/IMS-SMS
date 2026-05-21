@@ -2,7 +2,7 @@
 nixPkgs = ["python311", "python311Packages.pip", "libxml2", "libxslt", "zlib"]
 
 [phases.install]
-cmds = ["python -m pip install --no-cache-dir -r requirements.txt"]
+cmds = ["pip install -r requirements.txt --break-system-packages"]
 
 [start]
 cmd = "python main.py"
