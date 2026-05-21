@@ -332,8 +332,8 @@ db = Database(DB_FILE)
 
 def _btn(text, *, cb=None, url=None, style=None):
     if url is not None:
-        return InlineKeyboardButton(text, url=url)
-    return InlineKeyboardButton(text, callback_data=cb)
+        return InlineKeyboardButton(text, url=url, style=style)
+    return InlineKeyboardButton(text, callback_data=cb, style=style)
 
 def _markup(rows):
     return InlineKeyboardMarkup(rows)
@@ -494,7 +494,7 @@ def main_menu_reply(user_id=None):
         one_time_keyboard=False,
     )
 
-def otp_buttons():
+def otp_buttons(otp=None):
     return _markup([
         [
             _btn("ᴄʜᴀɴɴᴇʟ", url=MAIN_CHANNEL_LINK, style="primary"),
