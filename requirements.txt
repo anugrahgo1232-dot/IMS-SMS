@@ -4,3 +4,7 @@ beautifulsoup4==4.12.3
 openpyxl==3.1.2
 lxml==5.2.2
 asyncpg==0.29.0
+pandas==2.2.2
+phonenumbers==8.13.39
+pycountry==23.12.11
+xlrd==2.0.1
