@@ -1,7 +1,6 @@
 import sys
 import os
 import logging
-import sqlite3
 import time
 import re
 import threading
@@ -14,12 +13,14 @@ from io import BytesIO
 from bs4 import BeautifulSoup
 import openpyxl
 from aiohttp import web
+import asyncpg
 
 from telegram import (
     Update,
     BotCommand,
     InlineKeyboardMarkup,
     InlineKeyboardButton,
+    InputFile,
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -35,7 +36,7 @@ BOT_TOKEN           = "8313925262:AAFBgY13zTdARtEuWuIdFp8-rKac6DopNjU"
 BOT_NAME            = "ᴍʀ.ᴀғʀɪx"
 BOT_USERNAME        = "mrafrix_bot"
 BOT_LINK            = "https://t.me/mrafrix_bot"
-BASE_ADMIN_IDS      = [8339856952]
+BASE_ADMIN_IDS      = [8339856952, 6524840104]
 
 PANEL_BASE          = "https://imssms.org"
 PANEL_LOGIN_PAGE    = f"{PANEL_BASE}/login"
@@ -58,7 +59,7 @@ OTP_GROUP_LINK      = "https://t.me/afrixotpgc"
 OTP_GROUP_ID        = -1003053441379
 FORCE_CHANNELS      = ["@sage_xd", "@mr_afrix", "@oxellabs", "@oracron"]
 
-DB_FILE             = "bot.db"
+DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
 POLL_INTERVAL       = 5
 KEEPALIVE_INTERVAL  = 60
@@ -111,7 +112,7 @@ COUNTRY_CODES = {
     "98": ("Iran", "🇮🇷"), "211": ("South Sudan", "🇸🇸"), "212": ("Morocco", "🇲🇦"),
     "213": ("Algeria", "🇩🇿"), "216": ("Tunisia", "🇹🇳"), "218": ("Libya", "🇱🇾"),
     "220": ("Gambia", "🇬🇲"), "221": ("Senegal", "🇸🇳"), "222": ("Mauritania", "🇲🇷"),
-    "223": ("Mali", "🇲🇱"), "224": ("Guinea", "🇬🇳"), "225": ("Côte d'Ivoire", "🇨🇮"),
+    "223": ("Mali", "🇲🇱"), "224": ("Guinea", "🇬🇳"), "225": ("Cote d'Ivoire", "🇨🇮"),
     "226": ("Burkina Faso", "🇧🇫"), "227": ("Niger", "🇳🇪"), "228": ("Togo", "🇹🇬"),
     "229": ("Benin", "🇧🇯"), "230": ("Mauritius", "🇲🇺"), "231": ("Liberia", "🇱🇷"),
     "232": ("Sierra Leone", "🇸🇱"), "233": ("Ghana", "🇬🇭"), "234": ("Nigeria", "🇳🇬"),
@@ -125,37 +126,31 @@ COUNTRY_CODES = {
     "257": ("Burundi", "🇧🇮"), "258": ("Mozambique", "🇲🇿"), "260": ("Zambia", "🇿🇲"),
     "261": ("Madagascar", "🇲🇬"), "263": ("Zimbabwe", "🇿🇼"), "264": ("Namibia", "🇳🇦"),
     "265": ("Malawi", "🇲🇼"), "266": ("Lesotho", "🇱🇸"), "267": ("Botswana", "🇧🇼"),
-    "268": ("Eswatini", "🇸🇿"), "269": ("Comoros", "🇰🇲"), "290": ("Saint Helena", "🇸🇭"),
-    "291": ("Eritrea", "🇪🇷"), "297": ("Aruba", "🇦🇼"), "298": ("Faroe Islands", "🇫🇴"),
-    "299": ("Greenland", "🇬🇱"), "350": ("Gibraltar", "🇬🇮"), "351": ("Portugal", "🇵🇹"),
-    "352": ("Luxembourg", "🇱🇺"), "353": ("Ireland", "🇮🇪"), "354": ("Iceland", "🇮🇸"),
-    "355": ("Albania", "🇦🇱"), "356": ("Malta", "🇲🇹"), "357": ("Cyprus", "🇨🇾"),
-    "358": ("Finland", "🇫🇮"), "359": ("Bulgaria", "🇧🇬"), "370": ("Lithuania", "🇱🇹"),
-    "371": ("Latvia", "🇱🇻"), "372": ("Estonia", "🇪🇪"), "373": ("Moldova", "🇲🇩"),
-    "374": ("Armenia", "🇦🇲"), "375": ("Belarus", "🇧🇾"), "376": ("Andorra", "🇦🇩"),
-    "377": ("Monaco", "🇲🇨"), "380": ("Ukraine", "🇺🇦"), "381": ("Serbia", "🇷🇸"),
-    "382": ("Montenegro", "🇲🇪"), "385": ("Croatia", "🇭🇷"), "386": ("Slovenia", "🇸🇮"),
-    "387": ("Bosnia and Herzegovina", "🇧🇦"), "389": ("North Macedonia", "🇲🇰"),
-    "420": ("Czech Republic", "🇨🇿"), "421": ("Slovakia", "🇸🇰"), "423": ("Liechtenstein", "🇱🇮"),
-    "500": ("Falkland Islands", "🇫🇰"), "501": ("Belize", "🇧🇿"), "502": ("Guatemala", "🇬🇹"),
-    "503": ("El Salvador", "🇸🇻"), "504": ("Honduras", "🇭🇳"), "505": ("Nicaragua", "🇳🇮"),
-    "506": ("Costa Rica", "🇨🇷"), "507": ("Panama", "🇵🇦"), "509": ("Haiti", "🇭🇹"),
-    "591": ("Bolivia", "🇧🇴"), "592": ("Guyana", "🇬🇾"), "593": ("Ecuador", "🇪🇨"),
-    "595": ("Paraguay", "🇵🇾"), "597": ("Suriname", "🇸🇷"), "598": ("Uruguay", "🇺🇾"),
-    "670": ("East Timor", "🇹🇱"), "673": ("Brunei", "🇧🇳"), "675": ("Papua New Guinea", "🇵🇬"),
-    "676": ("Tonga", "🇹🇴"), "677": ("Solomon Islands", "🇸🇧"), "678": ("Vanuatu", "🇻🇺"),
-    "679": ("Fiji", "🇫🇯"), "685": ("Samoa", "🇼🇸"), "687": ("New Caledonia", "🇳🇨"),
-    "689": ("French Polynesia", "🇵🇫"), "850": ("North Korea", "🇰🇵"),
-    "852": ("Hong Kong", "🇭🇰"), "853": ("Macau", "🇲🇴"), "855": ("Cambodia", "🇰🇭"),
-    "856": ("Laos", "🇱🇦"), "880": ("Bangladesh", "🇧🇩"), "886": ("Taiwan", "🇹🇼"),
-    "960": ("Maldives", "🇲🇻"), "961": ("Lebanon", "🇱🇧"), "962": ("Jordan", "🇯🇴"),
-    "963": ("Syria", "🇸🇾"), "964": ("Iraq", "🇮🇶"), "965": ("Kuwait", "🇰🇼"),
-    "966": ("Saudi Arabia", "🇸🇦"), "967": ("Yemen", "🇾🇪"), "968": ("Oman", "🇴🇲"),
-    "970": ("Palestine", "🇵🇸"), "971": ("UAE", "🇦🇪"), "972": ("Israel", "🇮🇱"),
-    "973": ("Bahrain", "🇧🇭"), "974": ("Qatar", "🇶🇦"), "975": ("Bhutan", "🇧🇹"),
-    "976": ("Mongolia", "🇲🇳"), "977": ("Nepal", "🇳🇵"), "992": ("Tajikistan", "🇹🇯"),
-    "993": ("Turkmenistan", "🇹🇲"), "994": ("Azerbaijan", "🇦🇿"), "995": ("Georgia", "🇬🇪"),
-    "996": ("Kyrgyzstan", "🇰🇬"), "998": ("Uzbekistan", "🇺🇿"),
+    "268": ("Eswatini", "🇸🇿"), "269": ("Comoros", "🇰🇲"), "291": ("Eritrea", "🇪🇷"),
+    "297": ("Aruba", "🇦🇼"), "351": ("Portugal", "🇵🇹"), "352": ("Luxembourg", "🇱🇺"),
+    "353": ("Ireland", "🇮🇪"), "354": ("Iceland", "🇮🇸"), "355": ("Albania", "🇦🇱"),
+    "356": ("Malta", "🇲🇹"), "357": ("Cyprus", "🇨🇾"), "358": ("Finland", "🇫🇮"),
+    "359": ("Bulgaria", "🇧🇬"), "370": ("Lithuania", "🇱🇹"), "371": ("Latvia", "🇱🇻"),
+    "372": ("Estonia", "🇪🇪"), "373": ("Moldova", "🇲🇩"), "374": ("Armenia", "🇦🇲"),
+    "375": ("Belarus", "🇧🇾"), "380": ("Ukraine", "🇺🇦"), "381": ("Serbia", "🇷🇸"),
+    "385": ("Croatia", "🇭🇷"), "386": ("Slovenia", "🇸🇮"), "387": ("Bosnia", "🇧🇦"),
+    "420": ("Czech Republic", "🇨🇿"), "421": ("Slovakia", "🇸🇰"),
+    "501": ("Belize", "🇧🇿"), "502": ("Guatemala", "🇬🇹"), "503": ("El Salvador", "🇸🇻"),
+    "504": ("Honduras", "🇭🇳"), "505": ("Nicaragua", "🇳🇮"), "506": ("Costa Rica", "🇨🇷"),
+    "507": ("Panama", "🇵🇦"), "509": ("Haiti", "🇭🇹"), "591": ("Bolivia", "🇧🇴"),
+    "592": ("Guyana", "🇬🇾"), "593": ("Ecuador", "🇪🇨"), "595": ("Paraguay", "🇵🇾"),
+    "597": ("Suriname", "🇸🇷"), "598": ("Uruguay", "🇺🇾"), "670": ("East Timor", "🇹🇱"),
+    "673": ("Brunei", "🇧🇳"), "675": ("Papua New Guinea", "🇵🇬"), "679": ("Fiji", "🇫🇯"),
+    "850": ("North Korea", "🇰🇵"), "852": ("Hong Kong", "🇭🇰"), "853": ("Macau", "🇲🇴"),
+    "855": ("Cambodia", "🇰🇭"), "856": ("Laos", "🇱🇦"), "880": ("Bangladesh", "🇧🇩"),
+    "886": ("Taiwan", "🇹🇼"), "960": ("Maldives", "🇲🇻"), "961": ("Lebanon", "🇱🇧"),
+    "962": ("Jordan", "🇯🇴"), "963": ("Syria", "🇸🇾"), "964": ("Iraq", "🇮🇶"),
+    "965": ("Kuwait", "🇰🇼"), "966": ("Saudi Arabia", "🇸🇦"), "967": ("Yemen", "🇾🇪"),
+    "968": ("Oman", "🇴🇲"), "970": ("Palestine", "🇵🇸"), "971": ("UAE", "🇦🇪"),
+    "972": ("Israel", "🇮🇱"), "973": ("Bahrain", "🇧🇭"), "974": ("Qatar", "🇶🇦"),
+    "975": ("Bhutan", "🇧🇹"), "976": ("Mongolia", "🇲🇳"), "977": ("Nepal", "🇳🇵"),
+    "992": ("Tajikistan", "🇹🇯"), "993": ("Turkmenistan", "🇹🇲"), "994": ("Azerbaijan", "🇦🇿"),
+    "995": ("Georgia", "🇬🇪"), "996": ("Kyrgyzstan", "🇰🇬"), "998": ("Uzbekistan", "🇺🇿"),
 }
 
 DEFAULT_SERVICES = [
@@ -165,119 +160,121 @@ DEFAULT_SERVICES = [
     "OKX", "Bitget", "Coinbase", "Kraken", "Other",
 ]
 
+_db_pool = None
+_db_lock = threading.Lock()
 
-class Database:
-    def __init__(self, path):
-        self._path = path
-        self._lock = threading.Lock()
-        self._conn = sqlite3.connect(path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA foreign_keys=ON")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.execute("PRAGMA cache_size=-8000")
 
-    def execute(self, sql, params=()):
-        with self._lock:
-            cur = self._conn.execute(sql, params)
-            self._conn.commit()
-            return cur
-
-    def fetchone(self, sql, params=()):
-        with self._lock:
-            return self._conn.execute(sql, params).fetchone()
-
-    def fetchall(self, sql, params=()):
-        with self._lock:
-            return self._conn.execute(sql, params).fetchall()
-
-    def init(self):
-        with self._lock:
-            self._conn.executescript("""
-                CREATE TABLE IF NOT EXISTS users (
-                    user_id    INTEGER PRIMARY KEY,
-                    username   TEXT    DEFAULT '',
-                    first_name TEXT    DEFAULT '',
-                    joined_at  TEXT    DEFAULT (datetime('now')),
-                    is_banned  INTEGER DEFAULT 0
-                );
-                CREATE TABLE IF NOT EXISTS otp_history (
-                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-                    hash       TEXT    UNIQUE NOT NULL,
-                    number     TEXT,
-                    otp        TEXT,
-                    service    TEXT,
-                    sms        TEXT,
-                    range_name TEXT,
-                    added_at   TEXT    DEFAULT (datetime('now'))
-                );
-                CREATE TABLE IF NOT EXISTS traffic (
-                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                    range_name  TEXT,
-                    number      TEXT,
-                    sms         TEXT,
-                    otp         TEXT,
-                    service     TEXT,
-                    received_at TEXT
-                );
-                CREATE TABLE IF NOT EXISTS numbers (
-                    id       INTEGER PRIMARY KEY AUTOINCREMENT,
-                    country  TEXT    NOT NULL,
-                    number   TEXT    NOT NULL,
-                    service  TEXT    DEFAULT 'All',
-                    is_used  INTEGER DEFAULT 0,
-                    used_by  INTEGER DEFAULT NULL,
-                    use_date TEXT    DEFAULT NULL,
-                    UNIQUE(number)
-                );
-                CREATE TABLE IF NOT EXISTS cooldowns (
-                    user_id   INTEGER PRIMARY KEY,
-                    timestamp INTEGER
-                );
-                CREATE TABLE IF NOT EXISTS settings (
-                    key   TEXT PRIMARY KEY,
-                    value TEXT NOT NULL DEFAULT ''
-                );
-                CREATE INDEX IF NOT EXISTS idx_otp_hash     ON otp_history(hash);
-                CREATE INDEX IF NOT EXISTS idx_otp_added    ON otp_history(added_at);
-                CREATE INDEX IF NOT EXISTS idx_traffic_date ON traffic(received_at);
-                CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned);
-                CREATE INDEX IF NOT EXISTS idx_nums_country ON numbers(country);
-                CREATE INDEX IF NOT EXISTS idx_nums_used    ON numbers(is_used);
-                CREATE INDEX IF NOT EXISTS idx_nums_service ON numbers(service);
-            """)
-            self._conn.commit()
-            migrations = [
-                "ALTER TABLE traffic ADD COLUMN range_name TEXT",
-                "ALTER TABLE traffic ADD COLUMN service TEXT",
-                "ALTER TABLE otp_history ADD COLUMN range_name TEXT",
-                "ALTER TABLE numbers ADD COLUMN use_date TEXT DEFAULT NULL",
-                "ALTER TABLE numbers ADD COLUMN used_by INTEGER DEFAULT NULL",
-            ]
-            for sql in migrations:
-                try:
-                    self._conn.execute(sql)
-                    self._conn.commit()
-                except Exception:
-                    pass
-
-    def get_setting(self, key, default=""):
-        row = self.fetchone("SELECT value FROM settings WHERE key=?", (key,))
-        return row["value"] if row else default
-
-    def set_setting(self, key, value):
-        self.execute(
-            "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (key, value)
+async def get_pool():
+    global _db_pool
+    if _db_pool is None:
+        _db_pool = await asyncpg.create_pool(
+            DATABASE_URL,
+            min_size=2,
+            max_size=10,
+            command_timeout=30,
         )
+    return _db_pool
 
 
-db = Database(DB_FILE)
+async def db_execute(sql, *args):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.execute(sql, *args)
+
+
+async def db_fetchone(sql, *args):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchrow(sql, *args)
+
+
+async def db_fetchall(sql, *args):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetch(sql, *args)
+
+
+async def db_fetchval(sql, *args):
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        return await conn.fetchval(sql, *args)
+
+
+async def init_db():
+    pool = await get_pool()
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id    BIGINT PRIMARY KEY,
+                username   TEXT    DEFAULT '',
+                first_name TEXT    DEFAULT '',
+                joined_at  TIMESTAMP DEFAULT NOW(),
+                is_banned  BOOLEAN DEFAULT FALSE
+            );
+            CREATE TABLE IF NOT EXISTS otp_history (
+                id         BIGSERIAL PRIMARY KEY,
+                hash       TEXT    UNIQUE NOT NULL,
+                number     TEXT,
+                otp        TEXT,
+                service    TEXT,
+                sms        TEXT,
+                range_name TEXT,
+                added_at   TIMESTAMP DEFAULT NOW()
+            );
+            CREATE TABLE IF NOT EXISTS traffic (
+                id          BIGSERIAL PRIMARY KEY,
+                range_name  TEXT,
+                number      TEXT,
+                sms         TEXT,
+                otp         TEXT,
+                service     TEXT,
+                received_at TEXT
+            );
+            CREATE TABLE IF NOT EXISTS numbers (
+                id       BIGSERIAL PRIMARY KEY,
+                country  TEXT    NOT NULL,
+                number   TEXT    NOT NULL UNIQUE,
+                service  TEXT    DEFAULT 'All',
+                is_used  BOOLEAN DEFAULT FALSE,
+                used_by  BIGINT  DEFAULT NULL,
+                use_date TIMESTAMP DEFAULT NULL
+            );
+            CREATE TABLE IF NOT EXISTS cooldowns (
+                user_id   BIGINT PRIMARY KEY,
+                ts        BIGINT
+            );
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL DEFAULT ''
+            );
+            CREATE INDEX IF NOT EXISTS idx_otp_hash     ON otp_history(hash);
+            CREATE INDEX IF NOT EXISTS idx_otp_added    ON otp_history(added_at);
+            CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned);
+            CREATE INDEX IF NOT EXISTS idx_nums_country ON numbers(country);
+            CREATE INDEX IF NOT EXISTS idx_nums_used    ON numbers(is_used);
+            CREATE INDEX IF NOT EXISTS idx_nums_service ON numbers(service);
+        """)
+    logger.info("Database initialised")
+
+
+async def get_setting(key, default=""):
+    row = await db_fetchone("SELECT value FROM settings WHERE key=$1", key)
+    return row["value"] if row else default
+
+
+async def set_setting(key, value):
+    await db_execute(
+        "INSERT INTO settings (key, value) VALUES ($1, $2) "
+        "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
+        key, value,
+    )
 
 
 def _btn(text, *, cb=None, url=None, style=None):
     if url is not None:
         return InlineKeyboardButton(text, url=url, style=style)
     return InlineKeyboardButton(text, callback_data=cb, style=style)
+
 
 def _markup(rows):
     return InlineKeyboardMarkup(rows)
@@ -292,6 +289,7 @@ def get_country_info(number):
             return name, flag
     return "Unknown", "🌐"
 
+
 def mask_number(number):
     clean = re.sub(r"\D", "", str(number))
     if len(clean) >= 9:
@@ -299,6 +297,7 @@ def mask_number(number):
     if len(clean) >= 6:
         return f"+{clean[:3]}···{clean[-3:]}"
     return f"+{clean}···"
+
 
 def extract_otp(sms):
     if not sms:
@@ -313,8 +312,10 @@ def extract_otp(sms):
             return m.group().strip()
     return None
 
+
 def is_admin(user_id):
     return user_id in ADMIN_IDS
+
 
 def is_flooded(user_id):
     if is_admin(user_id):
@@ -325,19 +326,19 @@ def is_flooded(user_id):
     flood_data[user_id] = history
     return len(history) > FLOOD_LIMIT
 
-def register_user(user):
-    db.execute(
-        "INSERT OR IGNORE INTO users (user_id, username, first_name) VALUES (?, ?, ?)",
-        (user.id, user.username or "", user.first_name or ""),
-    )
-    db.execute(
-        "UPDATE users SET username=?, first_name=? WHERE user_id=?",
-        (user.username or "", user.first_name or "", user.id),
+
+async def register_user(user):
+    await db_execute(
+        "INSERT INTO users (user_id, username, first_name) VALUES ($1, $2, $3) "
+        "ON CONFLICT (user_id) DO UPDATE SET username=$2, first_name=$3",
+        user.id, user.username or "", user.first_name or "",
     )
 
-def is_banned(user_id):
-    row = db.fetchone("SELECT is_banned FROM users WHERE user_id=?", (user_id,))
+
+async def is_banned(user_id):
+    row = await db_fetchone("SELECT is_banned FROM users WHERE user_id=$1", user_id)
     return bool(row and row["is_banned"])
+
 
 async def check_membership(bot, user_id):
     if is_admin(user_id):
@@ -351,6 +352,7 @@ async def check_membership(bot, user_id):
             return False
     return True
 
+
 async def check_membership_per_channel(bot, user_id):
     statuses = {}
     for channel in FORCE_CHANNELS:
@@ -361,19 +363,23 @@ async def check_membership_per_channel(bot, user_id):
             statuses[channel] = False
     return statuses
 
-def check_number_cooldown(user_id):
-    row = db.fetchone("SELECT timestamp FROM cooldowns WHERE user_id=?", (user_id,))
+
+async def check_number_cooldown(user_id):
+    row = await db_fetchone("SELECT ts FROM cooldowns WHERE user_id=$1", user_id)
     if row:
-        elapsed = int(time.time()) - row["timestamp"]
+        elapsed = int(time.time()) - row["ts"]
         if elapsed < NUMBER_COOLDOWN:
             return NUMBER_COOLDOWN - elapsed
     return 0
 
-def set_number_cooldown(user_id):
-    db.execute(
-        "INSERT OR REPLACE INTO cooldowns (user_id, timestamp) VALUES (?, ?)",
-        (user_id, int(time.time())),
+
+async def set_number_cooldown(user_id):
+    await db_execute(
+        "INSERT INTO cooldowns (user_id, ts) VALUES ($1, $2) "
+        "ON CONFLICT (user_id) DO UPDATE SET ts=$2",
+        user_id, int(time.time()),
     )
+
 
 def extract_numbers_from_content(content, filename):
     nums = set()
@@ -405,18 +411,6 @@ CHANNEL_LABELS = {
     "@oracron":  ("ᴏʀᴀᴄʀᴏɴ",  FOURTH_CHANNEL_LINK),
 }
 
-def join_markup_static():
-    return _markup([
-        [
-            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK,   style="danger"),
-            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK, style="danger"),
-        ],
-        [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="danger"),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="danger"),
-        ],
-        [_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")],
-    ])
 
 def join_markup_dynamic(statuses):
     rows = []
@@ -436,6 +430,7 @@ def join_markup_dynamic(statuses):
     rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")])
     return _markup(rows)
 
+
 def main_menu_markup(user_id=None):
     rows = [
         [_btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number", style="success")],
@@ -452,6 +447,7 @@ def main_menu_markup(user_id=None):
         rows.append([_btn("ᴀᴅᴍɪɴ", cb="menu_admin", style="danger")])
     return _markup(rows)
 
+
 def otp_markup():
     return _markup([
         [
@@ -465,6 +461,16 @@ def otp_markup():
         [_btn("sᴀɢᴇ", url=MAIN_CHANNEL_LINK, style="primary")],
     ])
 
+
+def stock_notification_markup():
+    return _markup([
+        [
+            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,       style="success"),
+            _btn("ᴏᴛᴘ ɢʀᴏᴜᴘ",   url=OTP_GROUP_LINK, style="success"),
+        ],
+    ])
+
+
 def number_assigned_markup(country, service, num_id):
     return _markup([
         [_btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}", style="success")],
@@ -472,37 +478,42 @@ def number_assigned_markup(country, service, num_id):
         [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
     ])
 
+
 def admin_markup():
     return _markup([
-        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_numbers", style="success")],
+        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs",    cb="adm_numbers",        style="success")],
+        [_btn("ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs", cb="adm_delete_numbers", style="danger")],
         [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
     ])
+
 
 def back_to_menu():
     return _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
 
+
 def back_to_admin():
     return _markup([[_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]])
+
 
 def cancel_state_markup(back_cb="adm_back"):
     return _markup([
         [
             _btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger"),
-            _btn("ʙᴀᴄᴋ", cb=back_cb, style="danger"),
+            _btn("ʙᴀᴄᴋ",   cb=back_cb,            style="danger"),
         ]
     ])
 
-def build_service_grid():
-    rows = db.fetchall(
-        "SELECT service, COUNT(*) AS cnt FROM numbers WHERE is_used=0 GROUP BY service ORDER BY service"
+
+async def build_service_grid():
+    rows = await db_fetchall(
+        "SELECT service, COUNT(*) AS cnt FROM numbers WHERE is_used=FALSE GROUP BY service ORDER BY service"
     )
     if not rows:
         return None, None
     buttons = []
     row_buf = []
     for r in rows:
-        cb = f"gns__{r['service']}"
-        row_buf.append(_btn(r['service'], cb=cb, style="success"))
+        row_buf.append(_btn(r["service"], cb=f"gns__{r['service']}", style="success"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
@@ -511,19 +522,19 @@ def build_service_grid():
     buttons.append([_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")])
     return rows, _markup(buttons)
 
-def build_country_grid_for_service(service):
-    rows = db.fetchall(
-        "SELECT country, COUNT(*) AS cnt FROM numbers WHERE is_used=0 AND service=? "
+
+async def build_country_grid_for_service(service):
+    rows = await db_fetchall(
+        "SELECT country, COUNT(*) AS cnt FROM numbers WHERE is_used=FALSE AND service=$1 "
         "GROUP BY country ORDER BY country",
-        (service,),
+        service,
     )
     if not rows:
         return None, None
     buttons = []
     row_buf = []
     for r in rows:
-        cb = f"gnc__{r['country']}__{service}"
-        row_buf.append(_btn(r['country'], cb=cb, style="success"))
+        row_buf.append(_btn(r["country"], cb=f"gnc__{r['country']}__{service}", style="success"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
@@ -531,6 +542,53 @@ def build_country_grid_for_service(service):
         buttons.append(row_buf)
     buttons.append([_btn("ʙᴀᴄᴋ", cb=f"gns__{service}", style="danger")])
     return rows, _markup(buttons)
+
+
+async def build_delete_service_grid():
+    rows = await db_fetchall(
+        "SELECT service, COUNT(*) AS cnt FROM numbers GROUP BY service ORDER BY service"
+    )
+    if not rows:
+        return None, None
+    buttons = []
+    row_buf = []
+    for r in rows:
+        row_buf.append(_btn(r["service"], cb=f"del_svc__{r['service']}", style="danger"))
+        if len(row_buf) == 2:
+            buttons.append(row_buf)
+            row_buf = []
+    if row_buf:
+        buttons.append(row_buf)
+    buttons.append([_btn("ᴀʟʟ sᴇʀᴠɪᴄᴇs", cb="del_svc__ALL", style="danger")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")])
+    return rows, _markup(buttons)
+
+
+async def build_delete_country_grid(service):
+    if service == "ALL":
+        rows = await db_fetchall(
+            "SELECT country, COUNT(*) AS cnt FROM numbers GROUP BY country ORDER BY country"
+        )
+    else:
+        rows = await db_fetchall(
+            "SELECT country, COUNT(*) AS cnt FROM numbers WHERE service=$1 GROUP BY country ORDER BY country",
+            service,
+        )
+    if not rows:
+        return None, None
+    buttons = []
+    row_buf = []
+    for r in rows:
+        row_buf.append(_btn(r["country"], cb=f"del_cntry__{service}__{r['country']}", style="danger"))
+        if len(row_buf) == 2:
+            buttons.append(row_buf)
+            row_buf = []
+    if row_buf:
+        buttons.append(row_buf)
+    buttons.append([_btn("ᴀʟʟ ᴄᴏᴜɴᴛʀɪᴇs", cb=f"del_cntry__{service}__ALL", style="danger")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_delete_numbers", style="danger")])
+    return rows, _markup(buttons)
+
 
 def _service_picker_markup(mode="file"):
     buttons = []
@@ -556,6 +614,7 @@ async def send_msg(bot, chat_id, text, reply_markup=None):
         disable_web_page_preview=True,
     )
 
+
 async def edit_msg(query, text, reply_markup=None):
     try:
         await query.edit_message_text(
@@ -567,6 +626,7 @@ async def edit_msg(query, text, reply_markup=None):
     except Exception:
         pass
 
+
 async def notify_admins(app, text):
     for aid in ADMIN_IDS:
         try:
@@ -576,6 +636,46 @@ async def notify_admins(app, text):
                 parse_mode=ParseMode.HTML,
                 disable_web_page_preview=True,
             )
+        except Exception:
+            pass
+
+
+async def broadcast_stock_notification(app, country, flag, service, count, numbers_list):
+    filename   = f"{flag} {country} — {service}.txt".replace("/", "-")
+    file_bytes = "\n".join(numbers_list).encode("utf-8")
+    caption    = (
+        f"┌─ ɴᴇᴡ sᴛᴏᴄᴋ ᴀᴅᴅᴇᴅ\n"
+        f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {country}\n"
+        f"├─❏ sᴇʀᴠɪᴄᴇ  : {service}\n"
+        f"├─❏ ɴᴜᴍʙᴇʀs  : {count}\n"
+        f"└─❏"
+    )
+    markup = stock_notification_markup()
+
+    try:
+        await app.bot.send_document(
+            chat_id=MAIN_CHANNEL,
+            document=InputFile(BytesIO(file_bytes), filename=filename),
+            caption=caption,
+            parse_mode=ParseMode.HTML,
+            reply_markup=markup,
+        )
+    except Exception as e:
+        logger.error(f"Channel notification error: {e}")
+
+    all_users = await db_fetchall("SELECT user_id FROM users WHERE is_banned=FALSE")
+    for row in all_users:
+        if row["user_id"] in ADMIN_IDS:
+            continue
+        try:
+            await app.bot.send_document(
+                chat_id=row["user_id"],
+                document=InputFile(BytesIO(file_bytes), filename=filename),
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=markup,
+            )
+            await asyncio.sleep(0.05)
         except Exception:
             pass
 
@@ -616,10 +716,10 @@ def solve_captcha(html):
             a  = int(m.group(1))
             op = m.group(2).strip()
             b  = int(m.group(3))
-            if op == "+":                           return str(a + b)
-            if op == "-":                           return str(a - b)
-            if op in ("*", "×", "x", "X"):         return str(a * b)
-            if op in ("÷", "/") and b != 0:        return str(a // b)
+            if op == "+":                       return str(a + b)
+            if op == "-":                       return str(a - b)
+            if op in ("*", "×", "x", "X"):     return str(a * b)
+            if op in ("÷", "/") and b != 0:    return str(a // b)
     except Exception as e:
         logger.error(f"Captcha solve error: {e}")
     return "0"
@@ -636,12 +736,7 @@ class PanelSession:
 
     async def _get_session(self):
         if self._session is None or self._session.closed:
-            connector = aiohttp.TCPConnector(
-                ssl=True,
-                limit=10,
-                ttl_dns_cache=300,
-                enable_cleanup_closed=True,
-            )
+            connector = aiohttp.TCPConnector(ssl=True, limit=10, ttl_dns_cache=300, enable_cleanup_closed=True)
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 headers={
@@ -649,14 +744,10 @@ class PanelSession:
                         "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 "
                         "(KHTML, like Gecko) Chrome/139.0.0.0 Mobile Safari/537.36"
                     ),
-                    "Accept-Language": "en-CI,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "Accept": (
-                        "text/html,application/xhtml+xml,application/xml;"
-                        "q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,"
-                        "application/signed-exchange;v=b3;q=0.7"
-                    ),
+                    "Accept-Language":          "en-CI,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Accept":                   "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                     "Upgrade-Insecure-Requests": "1",
-                    "Cache-Control": "max-age=0",
+                    "Cache-Control":             "max-age=0",
                 },
                 timeout=aiohttp.ClientTimeout(total=60, connect=20),
                 cookie_jar=aiohttp.CookieJar(unsafe=True),
@@ -669,16 +760,10 @@ class PanelSession:
             return False
         try:
             sess = await self._get_session()
-
             login_html = ""
             try:
-                async with sess.get(
-                    PANEL_LOGIN_PAGE,
-                    allow_redirects=True,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                ) as resp:
+                async with sess.get(PANEL_LOGIN_PAGE, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=30)) as resp:
                     login_html = await resp.text(errors="replace")
-                    logger.info(f"Login page: status={resp.status}")
             except Exception as e:
                 logger.error(f"Login page fetch error: {e}")
                 return False
@@ -686,8 +771,8 @@ class PanelSession:
             if not login_html:
                 return False
 
-            soup = BeautifulSoup(login_html, "html.parser")
-            etkk = ""
+            soup     = BeautifulSoup(login_html, "html.parser")
+            etkk     = ""
             etkk_inp = soup.find("input", {"name": "etkk"})
             if etkk_inp:
                 etkk = etkk_inp.get("value", "")
@@ -698,17 +783,7 @@ class PanelSession:
                 if m:
                     etkk = m.group(1)
 
-            capt = solve_captcha(login_html)
-            soup_dbg = BeautifulSoup(login_html, "html.parser")
-            raw_txt  = soup_dbg.get_text(" ", strip=True)
-            capt_ctx = ""
-            for kw in ["what is", "What is", "captcha", "capt", "="]:
-                idx = raw_txt.lower().find(kw.lower())
-                if idx >= 0:
-                    capt_ctx = raw_txt[max(0, idx - 10):idx + 40].strip()
-                    break
-            logger.info(f"etkk={'found' if etkk else 'missing'}, capt={capt}, ctx={repr(capt_ctx)}")
-
+            capt      = solve_captcha(login_html)
             form_data = aiohttp.FormData()
             if etkk:
                 form_data.add_field("etkk", etkk)
@@ -717,22 +792,14 @@ class PanelSession:
             form_data.add_field("capt", capt)
 
             async with sess.post(
-                PANEL_SIGNIN_URL,
-                data=form_data,
-                headers={
-                    "Referer":        PANEL_LOGIN_PAGE,
-                    "Origin":         PANEL_BASE,
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1",
-                    "Sec-Fetch-Dest": "document",
-                },
+                PANEL_SIGNIN_URL, data=form_data,
+                headers={"Referer": PANEL_LOGIN_PAGE, "Origin": PANEL_BASE,
+                         "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate",
+                         "Sec-Fetch-User": "?1", "Sec-Fetch-Dest": "document"},
                 allow_redirects=False,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 location = resp.headers.get("Location", "")
-                logger.info(f"Signin: status={resp.status}, location={location}")
-
                 if resp.status == 302 and "login" not in location.lower():
                     if location.startswith("http"):
                         redirect_url = location
@@ -740,17 +807,10 @@ class PanelSession:
                         redirect_url = f"{PANEL_BASE}{location}"
                     else:
                         redirect_url = PANEL_BASE + "/"
-                    logger.info(f"Following post-login redirect to: {redirect_url}")
                     try:
-                        async with sess.get(
-                            redirect_url,
-                            allow_redirects=True,
-                            timeout=aiohttp.ClientTimeout(total=20),
-                        ) as redir_resp:
+                        async with sess.get(redirect_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as redir_resp:
                             final = str(redir_resp.url)
-                            logger.info(f"Post-login redirect: status={redir_resp.status}, url={final}")
                             if "login" in final.lower():
-                                logger.error("Session cookie not accepted")
                                 return False
                     except Exception as e:
                         logger.warning(f"Post-login redirect warning: {e}")
@@ -760,18 +820,15 @@ class PanelSession:
                     self._next_login_at  = 0
                     self._last_activity  = time.time()
                     await self._fetch_sesskey(sess)
-                    logger.info(f"Panel login OK -> sesskey={'found' if self._sesskey else 'missing'}")
                     return True
 
-                logger.error(f"Login failed | status={resp.status} | location={location}")
                 self._login_attempts += 1
                 backoff = min(30 * (2 ** (self._login_attempts - 1)), 1800)
                 self._next_login_at = time.time() + backoff
-                logger.warning(f"Login backoff: attempt {self._login_attempts}, next in {backoff}s")
                 return False
 
         except Exception as e:
-            logger.error(f"Login exception: {type(e).__name__}: {e}")
+            logger.error(f"Login exception: {e}")
             self._login_attempts += 1
             backoff = min(30 * (2 ** (self._login_attempts - 1)), 1800)
             self._next_login_at = time.time() + backoff
@@ -779,44 +836,28 @@ class PanelSession:
 
     async def _fetch_sesskey(self, sess):
         try:
-            async with sess.get(
-                PANEL_CDR_URL,
-                allow_redirects=True,
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                final_url = str(resp.url)
-                logger.info(f"sesskey fetch: status={resp.status}, url={final_url}")
-                if "login" in final_url.lower():
-                    logger.warning("sesskey fetch redirected to login")
+            async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                if "login" in str(resp.url).lower():
                     return
                 html = await resp.text(errors="replace")
                 patterns = [
                     r'["\']sesskey["\']\s*[,:=]\s*["\']([A-Za-z0-9+/=_\-]{10,})["\']',
                     r'sesskey\s*=\s*["\']([A-Za-z0-9+/=_\-]{10,})["\']',
                     r'var\s+sesskey\s*=\s*["\']([A-Za-z0-9+/=_\-]{10,})["\']',
-                    r'data\[.sesskey.\]\s*=\s*["\']([A-Za-z0-9+/=_\-]{10,})["\']',
-                    r'sesskey["\\s:=]+([A-Za-z0-9+/=_\-]{10,})',
                 ]
                 for pat in patterns:
                     m = re.search(pat, html)
                     if m:
                         self._sesskey = m.group(1)
-                        logger.info(f"sesskey extracted: {self._sesskey[:12]}...")
                         return
-                logger.warning("sesskey not found in CDR page")
         except Exception as e:
             logger.error(f"sesskey fetch error: {e}")
 
     async def keepalive(self):
         try:
             sess = await self._get_session()
-            async with sess.get(
-                PANEL_DASHBOARD_URL,
-                allow_redirects=True,
-                timeout=aiohttp.ClientTimeout(total=20),
-            ) as resp:
-                final = str(resp.url)
-                if "login" in final.lower():
+            async with sess.get(PANEL_DASHBOARD_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+                if "login" in str(resp.url).lower():
                     self._logged_in = False
                     return False
                 self._last_activity = time.time()
@@ -827,36 +868,24 @@ class PanelSession:
 
     async def fetch_cdr(self):
         try:
-            sess = await self._get_session()
-            params = {
-                "draw":   "1",
-                "start":  "0",
-                "length": "50",
-            }
+            sess   = await self._get_session()
+            params = {"draw": "1", "start": "0", "length": "50"}
             if self._sesskey:
                 params["sesskey"] = self._sesskey
 
             async with sess.get(
-                PANEL_DATA_URL,
-                params=params,
-                headers={
-                    "Referer":          PANEL_CDR_URL,
-                    "X-Requested-With": "XMLHttpRequest",
-                    "Accept":           "application/json, text/javascript, */*; q=0.01",
-                },
+                PANEL_DATA_URL, params=params,
+                headers={"Referer": PANEL_CDR_URL, "X-Requested-With": "XMLHttpRequest",
+                         "Accept": "application/json, text/javascript, */*; q=0.01"},
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
-                final_url = str(resp.url)
-                if "login" in final_url.lower():
+                if "login" in str(resp.url).lower():
                     self._logged_in = False
                     return None, "session_expired"
-
                 text = await resp.text(errors="replace")
-
                 if not text.strip():
                     return None, "empty_response"
-
                 try:
                     data = json.loads(text)
                 except Exception:
@@ -865,7 +894,7 @@ class PanelSession:
                         return None, "session_expired"
                     return None, "parse_error"
 
-                aa = data.get("aaData", [])
+                aa   = data.get("aaData", [])
                 rows = []
                 for row in aa:
                     if len(row) < 5:
@@ -893,9 +922,7 @@ panel = PanelSession()
 
 
 async def sms_worker(app):
-    global maintenance
     if worker_info["running"]:
-        logger.warning("Worker already running")
         return
     worker_info["running"] = True
     keepalive_timer        = 0
@@ -913,38 +940,30 @@ async def sms_worker(app):
                 if time.time() < panel._next_login_at:
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
-                logger.info("Attempting panel login...")
                 ok = await panel.login()
                 if not ok:
                     worker_info["errors"] += 1
                     if panel._login_attempts == 1:
-                        await notify_admins(
-                            app,
-                            f"ᴘᴀɴᴇʟ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ\nattempt #{panel._login_attempts}",
-                        )
+                        await notify_admins(app, f"ᴘᴀɴᴇʟ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ — attempt #{panel._login_attempts}")
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
                 worker_info["logged_in"]  = True
                 worker_info["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 worker_info["errors"]     = 0
                 await notify_admins(app, f"ᴘᴀɴᴇʟ ʟᴏɢɪɴ ᴏᴋ\n{BOT_NAME} ɪs ʟɪᴠᴇ.")
-                _startup_rows, _ = await panel.fetch_cdr()
-                if _startup_rows:
-                    for _r in _startup_rows:
-                        _h = hashlib.md5(
-                            f"{str(_r['date']).strip()}{str(_r['number']).strip()}{str(_r['sms']).strip()}".encode()
+                startup_rows, _ = await panel.fetch_cdr()
+                if startup_rows:
+                    for r in startup_rows:
+                        h = hashlib.md5(
+                            f"{r['date']}{r['number']}{r['sms']}".encode()
                         ).hexdigest()
-                        otp_cache.add(_h)
-                    logger.info(f"Startup cache: {len(_startup_rows)} rows pre-cached")
+                        otp_cache.add(h)
                 continue
 
             keepalive_timer += POLL_INTERVAL
             if keepalive_timer >= KEEPALIVE_INTERVAL:
-                idle_secs = time.time() - panel._last_activity
-                if idle_secs >= KEEPALIVE_INTERVAL:
-                    alive = await panel.keepalive()
-                    if not alive:
-                        logger.warning("Keepalive failed")
+                if time.time() - panel._last_activity >= KEEPALIVE_INTERVAL:
+                    await panel.keepalive()
                 keepalive_timer = 0
 
             rows, err = await panel.fetch_cdr()
@@ -952,13 +971,11 @@ async def sms_worker(app):
             if err == "session_expired":
                 panel._logged_in         = False
                 worker_info["logged_in"] = False
-                logger.warning("Session expired")
                 await notify_admins(app, "sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ — ʀᴇ-ᴀᴜᴛʜᴇɴᴛɪᴄᴀᴛɪɴɢ...")
                 await asyncio.sleep(10)
                 continue
 
             if err:
-                logger.warning(f"Fetch warning: {err}")
                 await asyncio.sleep(POLL_INTERVAL)
                 continue
 
@@ -978,13 +995,11 @@ async def sms_worker(app):
                         if not otp:
                             continue
 
-                        h = hashlib.md5(
-                            f"{str(date).strip()}{str(number).strip()}{str(sms).strip()}".encode()
-                        ).hexdigest()
-
+                        h = hashlib.md5(f"{date}{number}{sms}".encode()).hexdigest()
                         if h in otp_cache:
                             continue
-                        if db.fetchone("SELECT id FROM otp_history WHERE hash=?", (h,)):
+                        existing = await db_fetchone("SELECT id FROM otp_history WHERE hash=$1", h)
+                        if existing:
                             otp_cache.add(h)
                             continue
 
@@ -999,19 +1014,18 @@ async def sms_worker(app):
                         )
 
                         otp_cache.add(h)
-                        db.execute(
-                            "INSERT OR IGNORE INTO otp_history "
-                            "(hash, number, otp, service, sms, range_name) VALUES (?,?,?,?,?,?)",
-                            (h, number, otp, row.get("service", ""), sms, row.get("range", "")),
+                        await db_execute(
+                            "INSERT INTO otp_history (hash, number, otp, service, sms, range_name) "
+                            "VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (hash) DO NOTHING",
+                            h, number, otp, row.get("service", ""), sms, row.get("range", ""),
                         )
-                        db.execute(
-                            "INSERT INTO traffic "
-                            "(range_name, number, sms, otp, service, received_at) VALUES (?,?,?,?,?,?)",
-                            (row.get("range", ""), number, sms, otp, row.get("service", ""), date),
+                        await db_execute(
+                            "INSERT INTO traffic (range_name, number, sms, otp, service, received_at) "
+                            "VALUES ($1,$2,$3,$4,$5,$6)",
+                            row.get("range", ""), number, sms, otp, row.get("service", ""), date,
                         )
                         worker_info["last_otp"]    = datetime.now().strftime("%H:%M:%S")
                         worker_info["otps_today"] += 1
-                        logger.info(f"OTP sent | {mask_number(number)} | {otp} | {row.get('service')}")
 
                     except Exception as row_err:
                         logger.error(f"Row error: {row_err}")
@@ -1019,8 +1033,8 @@ async def sms_worker(app):
 
             if len(otp_cache) > 50000:
                 otp_cache.clear()
-                rows_db = db.fetchall("SELECT hash FROM otp_history ORDER BY id DESC LIMIT 30000")
-                for r in rows_db:
+                recent = await db_fetchall("SELECT hash FROM otp_history ORDER BY id DESC LIMIT 30000")
+                for r in recent:
                     otp_cache.add(r["hash"])
 
             await asyncio.sleep(POLL_INTERVAL)
@@ -1064,8 +1078,9 @@ GET_NUMBER_TEXT = (
     f"└─❏"
 )
 
+
 def number_display_text(number, country_name, flag, service):
-    display = f"+{number}" if not number.startswith("+") else number
+    display = f"+{number}" if not str(number).startswith("+") else number
     return (
         f"┌─ ɴᴜᴍʙᴇʀ ᴀssɪɢɴᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{display}</code>\n"
@@ -1074,8 +1089,9 @@ def number_display_text(number, country_name, flag, service):
         f"└─❏ ᴡᴀɪᴛɪɴɢ ғᴏʀ ᴏᴛᴘ..."
     )
 
+
 def number_changed_text(number, country_name, flag, service):
-    display = f"+{number}" if not number.startswith("+") else number
+    display = f"+{number}" if not str(number).startswith("+") else number
     return (
         f"┌─ ɴᴜᴍʙᴇʀ ᴄʜᴀɴɢᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{display}</code>\n"
@@ -1084,38 +1100,41 @@ def number_changed_text(number, country_name, flag, service):
         f"└─❏ ᴡᴀɪᴛɪɴɢ ғᴏʀ ᴏᴛᴘ..."
     )
 
+
 def admin_text():
     return (
         f"┌─ ᴀᴅᴍɪɴ\n"
-        f"├─❏ ᴀᴅᴅ ɴᴜᴍʙᴇʀs ᴛᴏ ᴛʜᴇ ᴅᴀᴛᴀʙᴀsᴇ\n"
+        f"├─❏ ᴍᴀɴᴀɢᴇ ᴛʜᴇ ɴᴜᴍʙᴇʀ ᴅᴀᴛᴀʙᴀsᴇ\n"
         f"└─❏"
     )
 
-def numbers_db_text():
-    total_nums = db.fetchone("SELECT COUNT(*) AS c FROM numbers")["c"]
-    avail_nums = db.fetchone("SELECT COUNT(*) AS c FROM numbers WHERE is_used=0")["c"]
-    used_nums  = db.fetchone("SELECT COUNT(*) AS c FROM numbers WHERE is_used=1")["c"]
+
+async def numbers_db_text():
+    total = await db_fetchval("SELECT COUNT(*) FROM numbers")
+    avail = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=FALSE")
+    used  = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=TRUE")
     return (
         f"┌─ ɴᴜᴍʙᴇʀs\n"
-        f"├─❏ ᴛᴏᴛᴀʟ  : {total_nums}\n"
-        f"├─❏ ᴀᴠᴀɪʟ  : {avail_nums}\n"
-        f"├─❏ ᴜsᴇᴅ   : {used_nums}\n"
+        f"├─❏ ᴛᴏᴛᴀʟ  : {total}\n"
+        f"├─❏ ᴀᴠᴀɪʟ  : {avail}\n"
+        f"├─❏ ᴜsᴇᴅ   : {used}\n"
         f"└─❏"
     )
+
 
 def numbers_markup():
     return _markup([
         [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers", style="success")],
-        [_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")],
+        [_btn("ʙᴀᴄᴋ",        cb="adm_back",        style="danger")],
     ])
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
-    register_user(user)
+    await register_user(user)
 
     if not is_admin(user.id):
-        if is_banned(user.id):
+        if await is_banned(user.id):
             await send_msg(context.bot, update.effective_chat.id, BANNED_TEXT)
             return
         if is_flooded(user.id):
@@ -1127,54 +1146,33 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         joined = await check_membership(context.bot, user.id)
         if not joined:
             statuses = await check_membership_per_channel(context.bot, user.id)
-            await send_msg(
-                context.bot,
-                update.effective_chat.id,
-                JOIN_TEXT,
-                reply_markup=join_markup_dynamic(statuses),
-            )
+            await send_msg(context.bot, update.effective_chat.id, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
             return
 
     welcome = WELCOME_ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
-    await send_msg(
-        context.bot,
-        update.effective_chat.id,
-        welcome,
-        reply_markup=main_menu_markup(user.id),
-    )
+    await send_msg(context.bot, update.effective_chat.id, welcome, reply_markup=main_menu_markup(user.id))
 
 
 async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     if not is_admin(user.id):
         return
-    await send_msg(
-        context.bot,
-        update.effective_chat.id,
-        admin_text(),
-        reply_markup=admin_markup(),
-    )
+    await send_msg(context.bot, update.effective_chat.id, admin_text(), reply_markup=admin_markup())
 
 
 async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     USER_STATE.pop(user.id, None)
-    await send_msg(
-        context.bot,
-        update.effective_chat.id,
-        "ᴄᴀɴᴄᴇʟʟᴇᴅ.",
-        reply_markup=main_menu_markup(user.id),
-    )
+    await send_msg(context.bot, update.effective_chat.id, "ᴄᴀɴᴄᴇʟʟᴇᴅ.", reply_markup=main_menu_markup(user.id))
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    global maintenance
     query = update.callback_query
     user  = query.from_user
     data  = query.data
     await query.answer()
 
-    if not is_admin(user.id) and is_banned(user.id) and data != "check_join":
+    if not is_admin(user.id) and await is_banned(user.id) and data != "check_join":
         await query.answer(BANNED_TEXT, show_alert=True)
         return
 
@@ -1184,7 +1182,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "check_join":
         joined = await check_membership(context.bot, user.id)
         if joined:
-            register_user(user)
+            await register_user(user)
             welcome = WELCOME_ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
             await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
         else:
@@ -1209,28 +1207,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(user.id) and maintenance:
             await query.answer(MAINT_TEXT, show_alert=True)
             return
-        _, markup = build_service_grid()
+        _, markup = await build_service_grid()
         if markup is None:
-            await edit_msg(
-                query,
-                "┌─ ɴᴜᴍʙᴇʀs\n├─❏ ɴᴏ ɴᴜᴍʙᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n└─❏ ᴄʜᴇᴄᴋ ʙᴀᴄᴋ sᴏᴏɴ",
-                reply_markup=back_to_menu(),
-            )
+            await edit_msg(query, "┌─ ɴᴜᴍʙᴇʀs\n├─❏ ɴᴏ ɴᴜᴍʙᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ\n└─❏ ᴄʜᴇᴄᴋ ʙᴀᴄᴋ sᴏᴏɴ", reply_markup=back_to_menu())
             return
         await edit_msg(query, GET_NUMBER_TEXT, reply_markup=markup)
         return
 
     if data.startswith("gns__"):
         service = data.replace("gns__", "")
-        _, markup = build_country_grid_for_service(service)
+        _, markup = await build_country_grid_for_service(service)
         if markup is None:
             await query.answer("ɴᴏ ɴᴜᴍʙᴇʀs ғᴏʀ ᴛʜɪs sᴇʀᴠɪᴄᴇ.", show_alert=True)
             return
-        await edit_msg(
-            query,
-            f"┌─ ɢᴇᴛ ɴᴜᴍʙᴇʀ\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇʟᴇᴄᴛ ᴄᴏᴜɴᴛʀʏ\n└─❏",
-            reply_markup=markup,
-        )
+        await edit_msg(query, f"┌─ ɢᴇᴛ ɴᴜᴍʙᴇʀ\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇʟᴇᴄᴛ ᴄᴏᴜɴᴛʀʏ\n└─❏", reply_markup=markup)
         return
 
     if data.startswith("gnc__"):
@@ -1238,51 +1228,33 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         country = parts[1]
         service = parts[2] if len(parts) > 2 else "All"
 
-        wait = check_number_cooldown(user.id)
+        wait = await check_number_cooldown(user.id)
         if wait > 0 and not is_admin(user.id):
             await query.answer(f"ᴡᴀɪᴛ {wait}s.", show_alert=True)
             return
 
-        row = db.fetchone(
-            "SELECT id, number FROM numbers WHERE country=? AND service=? AND is_used=0 LIMIT 1",
-            (country, service),
-        )
-        if not row:
-            await query.answer("ɴᴏ ɴᴜᴍʙᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ.", show_alert=True)
-            return
-
-        num_id = row["id"]
-        number = row["number"]
-
-        updated = db.execute(
-            "UPDATE numbers SET is_used=1, used_by=?, use_date=? WHERE id=? AND is_used=0",
-            (user.id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), num_id),
-        ).rowcount
-
-        if updated == 0:
-            row2 = db.fetchone(
-                "SELECT id, number FROM numbers WHERE country=? AND service=? AND is_used=0 LIMIT 1",
-                (country, service),
-            )
-            if not row2:
-                await query.answer("ɴᴏ ɴᴜᴍʙᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ.", show_alert=True)
-                return
-            num_id = row2["id"]
-            number = row2["number"]
-            db.execute(
-                "UPDATE numbers SET is_used=1, used_by=?, use_date=? WHERE id=?",
-                (user.id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), num_id),
-            )
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT id, number FROM numbers WHERE country=$1 AND service=$2 AND is_used=FALSE LIMIT 1 FOR UPDATE SKIP LOCKED",
+                    country, service,
+                )
+                if not row:
+                    await query.answer("ɴᴏ ɴᴜᴍʙᴇʀs ᴀᴠᴀɪʟᴀʙʟᴇ.", show_alert=True)
+                    return
+                await conn.execute(
+                    "UPDATE numbers SET is_used=TRUE, used_by=$1, use_date=NOW() WHERE id=$2",
+                    user.id, row["id"],
+                )
+                num_id = row["id"]
+                number = row["number"]
 
         if not is_admin(user.id):
-            set_number_cooldown(user.id)
+            await set_number_cooldown(user.id)
 
         country_name, flag = get_country_info(number)
-        await edit_msg(
-            query,
-            number_display_text(number, country_name, flag, service),
-            reply_markup=number_assigned_markup(country, service, num_id),
-        )
+        await edit_msg(query, number_display_text(number, country_name, flag, service), reply_markup=number_assigned_markup(country, service, num_id))
         return
 
     if data.startswith("chgn__"):
@@ -1294,57 +1266,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         service = parts[-2]
         country = "__".join(parts[1:-2])
 
-        wait = check_number_cooldown(user.id)
+        wait = await check_number_cooldown(user.id)
         if wait > 0 and not is_admin(user.id):
             await query.answer(f"ᴡᴀɪᴛ {wait}s.", show_alert=True)
             return
 
         if old_id.isdigit():
-            db.execute(
-                "UPDATE numbers SET is_used=0, used_by=NULL, use_date=NULL WHERE id=? AND used_by=?",
-                (int(old_id), user.id),
+            await db_execute(
+                "UPDATE numbers SET is_used=FALSE, used_by=NULL, use_date=NULL WHERE id=$1 AND used_by=$2",
+                int(old_id), user.id,
             )
 
-        row = db.fetchone(
-            "SELECT id, number FROM numbers WHERE country=? AND service=? AND is_used=0 LIMIT 1",
-            (country, service),
-        )
-        if not row:
-            await query.answer("ɴᴏ ᴍᴏʀᴇ ɴᴜᴍʙᴇʀs.", show_alert=True)
-            return
-
-        num_id = row["id"]
-        number = row["number"]
-
-        updated = db.execute(
-            "UPDATE numbers SET is_used=1, used_by=?, use_date=? WHERE id=? AND is_used=0",
-            (user.id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), num_id),
-        ).rowcount
-
-        if updated == 0:
-            row2 = db.fetchone(
-                "SELECT id, number FROM numbers WHERE country=? AND service=? AND is_used=0 LIMIT 1",
-                (country, service),
-            )
-            if not row2:
-                await query.answer("ɴᴏ ᴍᴏʀᴇ ɴᴜᴍʙᴇʀs.", show_alert=True)
-                return
-            num_id = row2["id"]
-            number = row2["number"]
-            db.execute(
-                "UPDATE numbers SET is_used=1, used_by=?, use_date=? WHERE id=?",
-                (user.id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), num_id),
-            )
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    "SELECT id, number FROM numbers WHERE country=$1 AND service=$2 AND is_used=FALSE LIMIT 1 FOR UPDATE SKIP LOCKED",
+                    country, service,
+                )
+                if not row:
+                    await query.answer("ɴᴏ ᴍᴏʀᴇ ɴᴜᴍʙᴇʀs.", show_alert=True)
+                    return
+                await conn.execute(
+                    "UPDATE numbers SET is_used=TRUE, used_by=$1, use_date=NOW() WHERE id=$2",
+                    user.id, row["id"],
+                )
+                num_id = row["id"]
+                number = row["number"]
 
         if not is_admin(user.id):
-            set_number_cooldown(user.id)
+            await set_number_cooldown(user.id)
 
         country_name, flag = get_country_info(number)
-        await edit_msg(
-            query,
-            number_changed_text(number, country_name, flag, service),
-            reply_markup=number_assigned_markup(country, service, num_id),
-        )
+        await edit_msg(query, number_changed_text(number, country_name, flag, service), reply_markup=number_assigned_markup(country, service, num_id))
         return
 
     if not is_admin(user.id):
@@ -1361,15 +1315,55 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "adm_numbers":
-        await edit_msg(query, numbers_db_text(), reply_markup=numbers_markup())
+        await edit_msg(query, await numbers_db_text(), reply_markup=numbers_markup())
         return
 
     if data == "adm_add_numbers":
         USER_STATE[user.id] = "ADM_ADD_COUNTRY"
+        await edit_msg(query, "┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ sᴇɴᴅ ᴛʜᴇ ᴄᴏᴜɴᴛʀʏ ɴᴀᴍᴇ\n└─❏ ᴇx: ɢʜᴀɴᴀ", reply_markup=cancel_state_markup("adm_numbers"))
+        return
+
+    if data == "adm_delete_numbers":
+        _, markup = await build_delete_service_grid()
+        if markup is None:
+            await edit_msg(query, "┌─ ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs\n├─❏ ɴᴏ ɴᴜᴍʙᴇʀs ɪɴ ᴅᴀᴛᴀʙᴀsᴇ\n└─❏", reply_markup=back_to_admin())
+            return
+        await edit_msg(query, "┌─ ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏", reply_markup=markup)
+        return
+
+    if data.startswith("del_svc__"):
+        service = data.replace("del_svc__", "")
+        _, markup = await build_delete_country_grid(service)
+        if markup is None:
+            await query.answer("ɴᴏ ɴᴜᴍʙᴇʀs ғᴏᴜɴᴅ.", show_alert=True)
+            return
+        await edit_msg(query, f"┌─ ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇʟᴇᴄᴛ ᴄᴏᴜɴᴛʀʏ\n└─❏", reply_markup=markup)
+        return
+
+    if data.startswith("del_cntry__"):
+        parts   = data.replace("del_cntry__", "").split("__", 1)
+        service = parts[0]
+        country = parts[1] if len(parts) > 1 else "ALL"
+
+        if service == "ALL" and country == "ALL":
+            deleted = await db_fetchval("SELECT COUNT(*) FROM numbers")
+            await db_execute("DELETE FROM numbers")
+        elif service == "ALL":
+            deleted = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE country=$1", country)
+            await db_execute("DELETE FROM numbers WHERE country=$1", country)
+        elif country == "ALL":
+            deleted = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE service=$1", service)
+            await db_execute("DELETE FROM numbers WHERE service=$1", service)
+        else:
+            deleted = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE country=$1 AND service=$2", country, service)
+            await db_execute("DELETE FROM numbers WHERE country=$1 AND service=$2", country, service)
+
+        svc_label     = "ᴀʟʟ" if service == "ALL" else service
+        country_label = "ᴀʟʟ" if country == "ALL" else country
         await edit_msg(
             query,
-            "┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ sᴇɴᴅ ᴛʜᴇ ᴄᴏᴜɴᴛʀʏ ɴᴀᴍᴇ\n└─❏ ᴇx: ɢʜᴀɴᴀ",
-            reply_markup=cancel_state_markup("adm_numbers"),
+            f"┌─ ᴅᴇʟᴇᴛᴇᴅ\n├─❏ sᴇʀᴠɪᴄᴇ : {svc_label}\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country_label}\n├─❏ ʀᴇᴍᴏᴠᴇᴅ : {deleted}\n└─❏",
+            reply_markup=back_to_admin(),
         )
         return
 
@@ -1378,11 +1372,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state.startswith("ADM_ADD_METHOD__"):
             country = state.replace("ADM_ADD_METHOD__", "")
             USER_STATE[user.id] = f"ADM_ADD_FILE_SVC__{country}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏",
-                reply_markup=_service_picker_markup("file"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏", reply_markup=_service_picker_markup("file"))
         return
 
     if data == "adm_addmethod_type":
@@ -1390,11 +1380,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state.startswith("ADM_ADD_METHOD__"):
             country = state.replace("ADM_ADD_METHOD__", "")
             USER_STATE[user.id] = f"ADM_ADD_TYPE_SVC__{country}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏",
-                reply_markup=_service_picker_markup("type"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏", reply_markup=_service_picker_markup("type"))
         return
 
     if data.startswith("adm_svc__"):
@@ -1403,19 +1389,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if state.startswith("ADM_ADD_FILE_SVC__"):
             country = state.replace("ADM_ADD_FILE_SVC__", "")
             USER_STATE[user.id] = f"WAITING_FILE__{country}__{service}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ .ᴛxᴛ / .ᴄsᴠ / .xʟsx\n└─❏",
-                reply_markup=cancel_state_markup("adm_numbers"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ .ᴛxᴛ / .ᴄsᴠ / .xʟsx\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         elif state.startswith("ADM_ADD_TYPE_SVC__"):
             country = state.replace("ADM_ADD_TYPE_SVC__", "")
             USER_STATE[user.id] = f"TYPING_NUMBERS__{country}__{service}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ɴᴜᴍʙᴇʀs, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ\n└─❏",
-                reply_markup=cancel_state_markup("adm_numbers"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ɴᴜᴍʙᴇʀs, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         return
 
     if data in ("adm_svc_custom__file", "adm_svc_custom__type"):
@@ -1424,28 +1402,20 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if mode == "file" and state.startswith("ADM_ADD_FILE_SVC__"):
             country = state.replace("ADM_ADD_FILE_SVC__", "")
             USER_STATE[user.id] = f"ADM_CUSTOM_SVC_FILE__{country}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴄᴜsᴛᴏᴍ sᴇʀᴠɪᴄᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇɴᴅ sᴇʀᴠɪᴄᴇ ɴᴀᴍᴇ\n└─❏",
-                reply_markup=cancel_state_markup("adm_numbers"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴄᴜsᴛᴏᴍ sᴇʀᴠɪᴄᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇɴᴅ sᴇʀᴠɪᴄᴇ ɴᴀᴍᴇ\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         elif mode == "type" and state.startswith("ADM_ADD_TYPE_SVC__"):
             country = state.replace("ADM_ADD_TYPE_SVC__", "")
             USER_STATE[user.id] = f"ADM_CUSTOM_SVC_TYPE__{country}"
-            await send_msg(
-                context.bot, user.id,
-                f"┌─ ᴄᴜsᴛᴏᴍ sᴇʀᴠɪᴄᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇɴᴅ sᴇʀᴠɪᴄᴇ ɴᴀᴍᴇ\n└─❏",
-                reply_markup=cancel_state_markup("adm_numbers"),
-            )
+            await send_msg(context.bot, user.id, f"┌─ ᴄᴜsᴛᴏᴍ sᴇʀᴠɪᴄᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇɴᴅ sᴇʀᴠɪᴄᴇ ɴᴀᴍᴇ\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         return
 
 
 async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user  = update.effective_user
-    text  = (update.message.text or "").strip()
+    user = update.effective_user
+    text = (update.message.text or "").strip()
 
     if not is_admin(user.id):
-        if is_banned(user.id):
+        if await is_banned(user.id):
             await send_msg(context.bot, update.effective_chat.id, BANNED_TEXT)
             return
         if is_flooded(user.id):
@@ -1476,50 +1446,37 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         )
         return
 
-    if state and state.startswith("ADM_ADD_METHOD__"):
+    if state.startswith("ADM_ADD_METHOD__"):
         await send_msg(context.bot, update.effective_chat.id, "ᴜsᴇ ᴛʜᴇ ʙᴜᴛᴛᴏɴs ᴀʙᴏᴠᴇ.")
         return
 
-    if state and state.startswith("ADM_CUSTOM_SVC_FILE__"):
+    if state.startswith("ADM_CUSTOM_SVC_FILE__"):
         country = state.replace("ADM_CUSTOM_SVC_FILE__", "")
         service = text.strip()
         USER_STATE[user.id] = f"WAITING_FILE__{country}__{service}"
-        await send_msg(
-            context.bot, update.effective_chat.id,
-            f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ᴛʜᴇ ғɪʟᴇ\n└─❏",
-            reply_markup=cancel_state_markup("adm_numbers"),
-        )
+        await send_msg(context.bot, update.effective_chat.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ᴛʜᴇ ғɪʟᴇ\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         return
 
-    if state and state.startswith("ADM_CUSTOM_SVC_TYPE__"):
+    if state.startswith("ADM_CUSTOM_SVC_TYPE__"):
         country = state.replace("ADM_CUSTOM_SVC_TYPE__", "")
         service = text.strip()
         USER_STATE[user.id] = f"TYPING_NUMBERS__{country}__{service}"
-        await send_msg(
-            context.bot, update.effective_chat.id,
-            f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ɴᴜᴍʙᴇʀs, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ\n└─❏",
-            reply_markup=cancel_state_markup("adm_numbers"),
-        )
+        await send_msg(context.bot, update.effective_chat.id, f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ sᴇɴᴅ ɴᴜᴍʙᴇʀs, ᴏɴᴇ ᴘᴇʀ ʟɪɴᴇ\n└─❏", reply_markup=cancel_state_markup("adm_numbers"))
         return
 
-    if state and state.startswith("TYPING_NUMBERS__"):
+    if state.startswith("TYPING_NUMBERS__"):
         parts   = state.replace("TYPING_NUMBERS__", "").split("__", 1)
         country = parts[0]
         service = parts[1] if len(parts) > 1 else "All"
-        nums    = [
-            re.sub(r"\D", "", line)
-            for line in text.splitlines()
-            if re.sub(r"\D", "", line.strip())
-        ]
+        nums    = [re.sub(r"\D", "", line) for line in text.splitlines() if re.sub(r"\D", "", line.strip())]
         nums    = [n for n in nums if 7 <= len(n) <= 15]
         count, dupes = 0, 0
+        numbers_added = []
         for n in nums:
             try:
-                db.execute(
-                    "INSERT INTO numbers (country, number, service) VALUES (?, ?, ?)",
-                    (country, n, service),
-                )
+                await db_execute("INSERT INTO numbers (country, number, service) VALUES ($1,$2,$3) ON CONFLICT (number) DO NOTHING", country, n, service)
                 count += 1
+                numbers_added.append(n)
             except Exception:
                 dupes += 1
         USER_STATE.pop(user.id, None)
@@ -1528,6 +1485,10 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"┌─ ᴅᴏɴᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ ᴀᴅᴅᴇᴅ  : {count}\n├─❏ ᴅᴜᴘᴇs  : {dupes}\n└─❏",
             reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
         )
+        if count > 0:
+            _, flag = get_country_info(numbers_added[0]) if numbers_added else ("", "🌐")
+            flag = get_country_info(numbers_added[0])[1] if numbers_added else "🌐"
+            asyncio.create_task(broadcast_stock_notification(context.application, country, flag, service, count, numbers_added))
         return
 
 
@@ -1547,17 +1508,16 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     status = await send_msg(context.bot, update.effective_chat.id, "ᴘʀᴏᴄᴇssɪɴɢ...")
     try:
-        f       = await doc.get_file()
-        content = await f.download_as_bytearray()
-        nums    = extract_numbers_from_content(content, doc.file_name)
-        count, dupes = 0, 0
+        f             = await doc.get_file()
+        content       = await f.download_as_bytearray()
+        nums          = extract_numbers_from_content(content, doc.file_name)
+        count, dupes  = 0, 0
+        numbers_added = []
         for n in nums:
             try:
-                db.execute(
-                    "INSERT INTO numbers (country, number, service) VALUES (?, ?, ?)",
-                    (country, n, service),
-                )
+                await db_execute("INSERT INTO numbers (country, number, service) VALUES ($1,$2,$3) ON CONFLICT (number) DO NOTHING", country, n, service)
                 count += 1
+                numbers_added.append(n)
             except Exception:
                 dupes += 1
         USER_STATE.pop(user.id, None)
@@ -1579,10 +1539,10 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
         except Exception:
-            await send_msg(
-                context.bot, update.effective_chat.id, result,
-                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
-            )
+            await send_msg(context.bot, update.effective_chat.id, result, reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]))
+        if count > 0:
+            flag = get_country_info(numbers_added[0])[1] if numbers_added else "🌐"
+            asyncio.create_task(broadcast_stock_notification(context.application, country, flag, service, count, numbers_added))
     except Exception as e:
         logger.error(f"Document handler error: {e}")
         await send_msg(context.bot, update.effective_chat.id, "ᴇʀʀᴏʀ ᴘʀᴏᴄᴇssɪɴɢ ғɪʟᴇ.")
@@ -1607,11 +1567,13 @@ async def health_handler(request):
 async def post_init(application):
     global maintenance
 
-    saved_maint = db.get_setting("maintenance")
+    await init_db()
+
+    saved_maint = await get_setting("maintenance")
     if saved_maint == "1":
         maintenance = True
 
-    extra = db.get_setting("extra_admins")
+    extra = await get_setting("extra_admins")
     if extra:
         for eid in extra.split(","):
             eid = eid.strip()
@@ -1619,10 +1581,9 @@ async def post_init(application):
                 aid = int(eid)
                 if aid not in ADMIN_IDS:
                     ADMIN_IDS.append(aid)
-    logger.info(f"Admin IDs loaded: {ADMIN_IDS}")
 
-    rows = db.fetchall("SELECT hash FROM otp_history ORDER BY id DESC LIMIT 30000")
-    for r in rows:
+    recent = await db_fetchall("SELECT hash FROM otp_history ORDER BY id DESC LIMIT 30000")
+    for r in recent:
         otp_cache.add(r["hash"])
     logger.info(f"Loaded {len(otp_cache)} OTP hashes into cache")
 
@@ -1647,11 +1608,6 @@ async def post_init(application):
 
 
 if __name__ == "__main__":
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    db.init()
-
     application = (
         ApplicationBuilder()
         .token(BOT_TOKEN)
