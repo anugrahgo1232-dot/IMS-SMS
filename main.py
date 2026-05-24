@@ -276,8 +276,8 @@ db = Database(DB_FILE)
 
 def _btn(text, *, cb=None, url=None, style=None):
     if url is not None:
-        return InlineKeyboardButton(text, url=url)
-    return InlineKeyboardButton(text, callback_data=cb)
+        return InlineKeyboardButton(text, url=url, style=style)
+    return InlineKeyboardButton(text, callback_data=cb, style=style)
 
 def _markup(rows):
     return InlineKeyboardMarkup(rows)
@@ -408,14 +408,14 @@ CHANNEL_LABELS = {
 def join_markup_static():
     return _markup([
         [
-            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK),
-            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK),
+            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK,   style="danger"),
+            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK, style="danger"),
         ],
         [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK),
+            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="danger"),
+            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="danger"),
         ],
-        [_btn("ᴠᴇʀɪғʏ", cb="check_join")],
+        [_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")],
     ])
 
 def join_markup_dynamic(statuses):
@@ -423,70 +423,72 @@ def join_markup_dynamic(statuses):
     pair = []
     for channel, (label, link) in CHANNEL_LABELS.items():
         joined = statuses.get(channel, False)
-        display = label if joined else label
-        btn = _btn(display, url=link) if not joined else _btn(display, cb=f"joined_noop__{channel}")
+        if joined:
+            btn = _btn(label, cb=f"joined_noop__{channel}", style="primary")
+        else:
+            btn = _btn(label, url=link, style="danger")
         pair.append(btn)
         if len(pair) == 2:
             rows.append(pair)
             pair = []
     if pair:
         rows.append(pair)
-    rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join")])
+    rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")])
     return _markup(rows)
 
 def main_menu_markup(user_id=None):
     rows = [
-        [_btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number")],
+        [_btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number", style="success")],
         [
-            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK),
-            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK),
+            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK,   style="primary"),
+            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK, style="primary"),
         ],
         [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK),
+            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="primary"),
+            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="primary"),
         ],
     ]
     if user_id and is_admin(user_id):
-        rows.append([_btn("ᴀᴅᴍɪɴ", cb="menu_admin")])
+        rows.append([_btn("ᴀᴅᴍɪɴ", cb="menu_admin", style="danger")])
     return _markup(rows)
 
 def otp_markup():
     return _markup([
         [
-            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK),
-            _btn("ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK),
+            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,            style="success"),
+            _btn("ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK, style="primary"),
         ],
         [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK),
+            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="primary"),
+            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="primary"),
         ],
-        [_btn("sᴀɢᴇ", url=MAIN_CHANNEL_LINK)],
+        [_btn("sᴀɢᴇ", url=MAIN_CHANNEL_LINK, style="primary")],
     ])
 
 def number_assigned_markup(country, service, num_id):
     return _markup([
-        [_btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}")],
-        [_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK)],
-        [_btn("ʙᴀᴄᴋ", cb="menu_back")],
+        [_btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}", style="success")],
+        [_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")],
+        [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
     ])
 
 def admin_markup():
     return _markup([
-        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_numbers")],
-        [_btn("ʙᴀᴄᴋ", cb="menu_back")],
+        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_numbers", style="success")],
+        [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
     ])
 
 def back_to_menu():
-    return _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back")]])
+    return _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
 
 def back_to_admin():
-    return _markup([[_btn("ʙᴀᴄᴋ", cb="adm_back")]])
+    return _markup([[_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]])
 
 def cancel_state_markup(back_cb="adm_back"):
     return _markup([
         [
-            _btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state"),
-            _btn("ʙᴀᴄᴋ", cb=back_cb),
+            _btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger"),
+            _btn("ʙᴀᴄᴋ", cb=back_cb, style="danger"),
         ]
     ])
 
@@ -500,13 +502,13 @@ def build_service_grid():
     row_buf = []
     for r in rows:
         cb = f"gns__{r['service']}"
-        row_buf.append(_btn(r['service'], cb=cb))
+        row_buf.append(_btn(r['service'], cb=cb, style="success"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ʙᴀᴄᴋ", cb="menu_back")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")])
     return rows, _markup(buttons)
 
 def build_country_grid_for_service(service):
@@ -521,27 +523,27 @@ def build_country_grid_for_service(service):
     row_buf = []
     for r in rows:
         cb = f"gnc__{r['country']}__{service}"
-        row_buf.append(_btn(r['country'], cb=cb))
+        row_buf.append(_btn(r['country'], cb=cb, style="success"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ʙᴀᴄᴋ", cb=f"gns__{service}")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb=f"gns__{service}", style="danger")])
     return rows, _markup(buttons)
 
 def _service_picker_markup(mode="file"):
     buttons = []
     row_buf = []
     for svc in DEFAULT_SERVICES:
-        row_buf.append(_btn(svc, cb=f"adm_svc__{svc}"))
+        row_buf.append(_btn(svc, cb=f"adm_svc__{svc}", style="primary"))
         if len(row_buf) == 3:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ᴄᴜsᴛᴏᴍ", cb=f"adm_svc_custom__{mode}")])
-    buttons.append([_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state")])
+    buttons.append([_btn("ᴄᴜsᴛᴏᴍ", cb=f"adm_svc_custom__{mode}", style="primary")])
+    buttons.append([_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger")])
     return _markup(buttons)
 
 
@@ -1103,8 +1105,8 @@ def numbers_db_text():
 
 def numbers_markup():
     return _markup([
-        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers")],
-        [_btn("ʙᴀᴄᴋ", cb="adm_back")],
+        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers", style="success")],
+        [_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")],
     ])
 
 
@@ -1284,15 +1286,24 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data.startswith("chgn__"):
-        parts   = data.split("__", 3)
-        country = parts[1]
-        service = parts[2] if len(parts) > 2 else "All"
-        old_id  = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else 0
+        parts   = data.split("__")
+        if len(parts) < 4:
+            await query.answer("ɪɴᴠᴀʟɪᴅ ʀᴇǫᴜᴇsᴛ.", show_alert=True)
+            return
+        old_id  = parts[-1]
+        service = parts[-2]
+        country = "__".join(parts[1:-2])
 
         wait = check_number_cooldown(user.id)
         if wait > 0 and not is_admin(user.id):
             await query.answer(f"ᴡᴀɪᴛ {wait}s.", show_alert=True)
             return
+
+        if old_id.isdigit():
+            db.execute(
+                "UPDATE numbers SET is_used=0, used_by=NULL, use_date=NULL WHERE id=? AND used_by=?",
+                (int(old_id), user.id),
+            )
 
         row = db.fetchone(
             "SELECT id, number FROM numbers WHERE country=? AND service=? AND is_used=0 LIMIT 1",
@@ -1457,10 +1468,10 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ ᴄʜᴏᴏsᴇ ᴍᴇᴛʜᴏᴅ\n└─❏",
             reply_markup=_markup([
                 [
-                    _btn("ᴜᴘʟᴏᴀᴅ ғɪʟᴇ", cb="adm_addmethod_file"),
-                    _btn("ᴛʏᴘᴇ ɴᴜᴍʙᴇʀs", cb="adm_addmethod_type"),
+                    _btn("ᴜᴘʟᴏᴀᴅ ғɪʟᴇ",   cb="adm_addmethod_file", style="primary"),
+                    _btn("ᴛʏᴘᴇ ɴᴜᴍʙᴇʀs", cb="adm_addmethod_type", style="primary"),
                 ],
-                [_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state")],
+                [_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger")],
             ]),
         )
         return
@@ -1515,7 +1526,7 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await send_msg(
             context.bot, update.effective_chat.id,
             f"┌─ ᴅᴏɴᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ ᴀᴅᴅᴇᴅ  : {count}\n├─❏ ᴅᴜᴘᴇs  : {dupes}\n└─❏",
-            reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]),
+            reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
         )
         return
 
@@ -1565,12 +1576,12 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=status.message_id,
                 text=result,
                 parse_mode=ParseMode.HTML,
-                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]),
+                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
         except Exception:
             await send_msg(
                 context.bot, update.effective_chat.id, result,
-                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]),
+                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
     except Exception as e:
         logger.error(f"Document handler error: {e}")
