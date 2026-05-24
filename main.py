@@ -59,6 +59,8 @@ OTP_GROUP_LINK      = "https://t.me/afrixotpgc"
 OTP_GROUP_ID        = -1003053441379
 FORCE_CHANNELS      = ["@sage_xd", "@mr_afrix", "@oxellabs", "@oracron"]
 
+STOCK_NOTIFY_CHANNEL_ID = -1002506491665
+
 DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
 POLL_INTERVAL       = 5
@@ -272,8 +274,8 @@ async def set_setting(key, value):
 
 def _btn(text, *, cb=None, url=None, style=None):
     if url is not None:
-        return InlineKeyboardButton(text, url=url, style=style)
-    return InlineKeyboardButton(text, callback_data=cb, style=style)
+        return InlineKeyboardButton(text, url=url)
+    return InlineKeyboardButton(text, callback_data=cb)
 
 
 def _markup(rows):
@@ -341,8 +343,6 @@ async def is_banned(user_id):
 
 
 async def check_membership(bot, user_id):
-    if is_admin(user_id):
-        return True
     for channel in FORCE_CHANNELS:
         try:
             member = await bot.get_chat_member(channel, user_id)
@@ -379,6 +379,16 @@ async def set_number_cooldown(user_id):
         "ON CONFLICT (user_id) DO UPDATE SET ts=$2",
         user_id, int(time.time()),
     )
+
+
+async def get_monthly_users():
+    now = datetime.now()
+    first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    count = await db_fetchval(
+        "SELECT COUNT(*) FROM users WHERE joined_at >= $1 AND is_banned=FALSE",
+        first_of_month,
+    )
+    return count or 0
 
 
 def extract_numbers_from_content(content, filename):
@@ -418,88 +428,104 @@ def join_markup_dynamic(statuses):
     for channel, (label, link) in CHANNEL_LABELS.items():
         joined = statuses.get(channel, False)
         if joined:
-            btn = _btn(label, cb=f"joined_noop__{channel}", style="primary")
+            btn = _btn(label, cb=f"joined_noop__{channel}")
         else:
-            btn = _btn(label, url=link, style="danger")
+            btn = _btn(label, url=link)
         pair.append(btn)
         if len(pair) == 2:
             rows.append(pair)
             pair = []
     if pair:
         rows.append(pair)
-    rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")])
+    rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join")])
     return _markup(rows)
 
 
-def main_menu_markup(user_id=None):
+async def main_menu_markup(bot, user_id=None):
     rows = [
-        [_btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number", style="success")],
-        [
-            _btn("sᴀɢᴇ",    url=MAIN_CHANNEL_LINK,   style="primary"),
-            _btn("ᴍʀᴀғʀɪx",  url=BACKUP_CHANNEL_LINK, style="primary"),
-        ],
-        [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="primary"),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="primary"),
-        ],
+        [_btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number")],
     ]
+
+    if user_id:
+        statuses = await check_membership_per_channel(bot, user_id)
+        unjoined = [
+            (label, link)
+            for channel, (label, link) in CHANNEL_LABELS.items()
+            if not statuses.get(channel, False)
+        ]
+        pair = []
+        for label, link in unjoined:
+            pair.append(_btn(label, url=link))
+            if len(pair) == 2:
+                rows.append(pair)
+                pair = []
+        if pair:
+            rows.append(pair)
+
+    rows.append([_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK)])
+
     if user_id and is_admin(user_id):
-        rows.append([_btn("ᴀᴅᴍɪɴ", cb="menu_admin", style="danger")])
+        rows.append([_btn("ᴀᴅᴍɪɴ", cb="menu_admin")])
     return _markup(rows)
 
 
 def otp_markup():
     return _markup([
         [
-            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,            style="success"),
-            _btn("ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK, style="primary"),
+            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK),
+            _btn("ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK),
         ],
         [
-            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK,  style="primary"),
-            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK, style="primary"),
+            _btn("ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK),
+            _btn("ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK),
         ],
-        [_btn("sᴀɢᴇ", url=MAIN_CHANNEL_LINK, style="primary")],
+        [_btn("sᴀɢᴇ", url=MAIN_CHANNEL_LINK)],
     ])
 
 
 def stock_notification_markup():
     return _markup([
         [
-            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,       style="success"),
-            _btn("ᴏᴛᴘ ɢʀᴏᴜᴘ",   url=OTP_GROUP_LINK, style="success"),
+            _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK),
+            _btn("ᴏᴛᴘ ɢʀᴏᴜᴘ",   url=OTP_GROUP_LINK),
         ],
     ])
 
 
 def number_assigned_markup(country, service, num_id):
     return _markup([
-        [_btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}", style="success")],
-        [_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")],
-        [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
+        [_btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}")],
+        [
+            _btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK),
+            _btn("ʙᴀᴄᴋ", cb="menu_back"),
+        ],
     ])
 
 
 def admin_markup():
     return _markup([
-        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs",    cb="adm_numbers",        style="success")],
-        [_btn("ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs", cb="adm_delete_numbers", style="danger")],
-        [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
+        [
+            _btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs",    cb="adm_numbers"),
+            _btn("ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs", cb="adm_delete_numbers"),
+        ],
+        [_btn("sᴛᴀᴛᴜs", cb="adm_status")],
+        [_btn("ʙᴀᴄᴋ", cb="menu_back")],
     ])
 
 
 def back_to_menu():
-    return _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
+    return _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back")]])
 
 
 def back_to_admin():
-    return _markup([[_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]])
+    return _markup([[_btn("ʙᴀᴄᴋ", cb="adm_back")]])
 
 
 def cancel_state_markup(back_cb="adm_back"):
     return _markup([
         [
-            _btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger"),
-            _btn("ʙᴀᴄᴋ",   cb=back_cb,            style="danger"),
+            _btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state"),
+            _btn("ʙᴀᴄᴋ",   cb=back_cb),
         ]
     ])
 
@@ -513,13 +539,13 @@ async def build_service_grid():
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(r["service"], cb=f"gns__{r['service']}", style="success"))
+        row_buf.append(_btn(r["service"], cb=f"gns__{r['service']}"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="menu_back")])
     return rows, _markup(buttons)
 
 
@@ -534,13 +560,13 @@ async def build_country_grid_for_service(service):
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(r["country"], cb=f"gnc__{r['country']}__{service}", style="success"))
+        row_buf.append(_btn(r["country"], cb=f"gnc__{r['country']}__{service}"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ʙᴀᴄᴋ", cb=f"gns__{service}", style="danger")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb=f"gns__{service}")])
     return rows, _markup(buttons)
 
 
@@ -553,14 +579,14 @@ async def build_delete_service_grid():
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(r["service"], cb=f"del_svc__{r['service']}", style="danger"))
+        row_buf.append(_btn(r["service"], cb=f"del_svc__{r['service']}"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ᴀʟʟ sᴇʀᴠɪᴄᴇs", cb="del_svc__ALL", style="danger")])
-    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")])
+    buttons.append([_btn("ᴀʟʟ sᴇʀᴠɪᴄᴇs", cb="del_svc__ALL")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_back")])
     return rows, _markup(buttons)
 
 
@@ -579,14 +605,14 @@ async def build_delete_country_grid(service):
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(r["country"], cb=f"del_cntry__{service}__{r['country']}", style="danger"))
+        row_buf.append(_btn(r["country"], cb=f"del_cntry__{service}__{r['country']}"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ᴀʟʟ ᴄᴏᴜɴᴛʀɪᴇs", cb=f"del_cntry__{service}__ALL", style="danger")])
-    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_delete_numbers", style="danger")])
+    buttons.append([_btn("ᴀʟʟ ᴄᴏᴜɴᴛʀɪᴇs", cb=f"del_cntry__{service}__ALL")])
+    buttons.append([_btn("ʙᴀᴄᴋ", cb="adm_delete_numbers")])
     return rows, _markup(buttons)
 
 
@@ -594,14 +620,14 @@ def _service_picker_markup(mode="file"):
     buttons = []
     row_buf = []
     for svc in DEFAULT_SERVICES:
-        row_buf.append(_btn(svc, cb=f"adm_svc__{svc}", style="primary"))
+        row_buf.append(_btn(svc, cb=f"adm_svc__{svc}"))
         if len(row_buf) == 3:
             buttons.append(row_buf)
             row_buf = []
     if row_buf:
         buttons.append(row_buf)
-    buttons.append([_btn("ᴄᴜsᴛᴏᴍ", cb=f"adm_svc_custom__{mode}", style="primary")])
-    buttons.append([_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger")])
+    buttons.append([_btn("ᴄᴜsᴛᴏᴍ", cb=f"adm_svc_custom__{mode}")])
+    buttons.append([_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state")])
     return _markup(buttons)
 
 
@@ -652,16 +678,17 @@ async def broadcast_stock_notification(app, country, flag, service, count, numbe
     )
     markup = stock_notification_markup()
 
-    try:
-        await app.bot.send_document(
-            chat_id=MAIN_CHANNEL,
-            document=InputFile(BytesIO(file_bytes), filename=filename),
-            caption=caption,
-            parse_mode=ParseMode.HTML,
-            reply_markup=markup,
-        )
-    except Exception as e:
-        logger.error(f"Channel notification error: {e}")
+    for target in [MAIN_CHANNEL, STOCK_NOTIFY_CHANNEL_ID]:
+        try:
+            await app.bot.send_document(
+                chat_id=target,
+                document=InputFile(BytesIO(file_bytes), filename=filename),
+                caption=caption,
+                parse_mode=ParseMode.HTML,
+                reply_markup=markup,
+            )
+        except Exception as e:
+            logger.error(f"Channel notification error ({target}): {e}")
 
     all_users = await db_fetchall("SELECT user_id FROM users WHERE is_banned=FALSE")
     for row in all_users:
@@ -944,13 +971,13 @@ async def sms_worker(app):
                 if not ok:
                     worker_info["errors"] += 1
                     if panel._login_attempts == 1:
-                        await notify_admins(app, f"ᴘᴀɴᴇʟ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ — attempt #{panel._login_attempts}")
+                        await notify_admins(app, f"┌─ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ\n├─❏ ᴘᴀɴᴇʟ : imssms.org\n├─❏ ᴀᴛᴛᴇᴍᴘᴛ : #{panel._login_attempts}\n└─❏ ʀᴇᴛʀʏɪɴɢ...")
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
                 worker_info["logged_in"]  = True
                 worker_info["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 worker_info["errors"]     = 0
-                await notify_admins(app, f"ᴘᴀɴᴇʟ ʟᴏɢɪɴ ᴏᴋ\n{BOT_NAME} ɪs ʟɪᴠᴇ.")
+                await notify_admins(app, f"┌─ ɪᴍs ʟᴏɢɪɴ\n├─❏ sᴛᴀᴛᴜs : ᴏɴʟɪɴᴇ\n├─❏ ᴘᴀɴᴇʟ : imssms.org\n├─❏ ᴜsᴇʀ : {PANEL_USERNAME}\n├─❏ ᴛɪᴍᴇ : {worker_info['last_login']}\n└─❏ {BOT_NAME} ɪs ʟɪᴠᴇ")
                 startup_rows, _ = await panel.fetch_cdr()
                 if startup_rows:
                     for r in startup_rows:
@@ -971,7 +998,7 @@ async def sms_worker(app):
             if err == "session_expired":
                 panel._logged_in         = False
                 worker_info["logged_in"] = False
-                await notify_admins(app, "sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ — ʀᴇ-ᴀᴜᴛʜᴇɴᴛɪᴄᴀᴛɪɴɢ...")
+                await notify_admins(app, "┌─ sᴇssɪᴏɴ ᴇxᴘɪʀᴇᴅ\n├─❏ ʀᴇ-ᴀᴜᴛʜᴇɴᴛɪᴄᴀᴛɪɴɢ...\n└─❏")
                 await asyncio.sleep(10)
                 continue
 
@@ -1045,7 +1072,7 @@ async def sms_worker(app):
             worker_info["errors"] += 1
             logger.error(f"Worker loop error: {e}")
             if worker_info["errors"] % 5 == 0:
-                await notify_admins(app, f"ᴡᴏʀᴋᴇʀ ᴇʀʀᴏʀ\n{e}")
+                await notify_admins(app, f"┌─ ᴡᴏʀᴋᴇʀ ᴇʀʀᴏʀ\n├─❏ {e}\n└─❏")
             await asyncio.sleep(15)
 
     worker_info["running"] = False
@@ -1122,10 +1149,30 @@ async def numbers_db_text():
     )
 
 
+async def status_text():
+    total_users   = await db_fetchval("SELECT COUNT(*) FROM users WHERE is_banned=FALSE") or 0
+    monthly_users = await get_monthly_users()
+    logged_status = "ᴏɴʟɪɴᴇ" if worker_info["logged_in"] else "ᴏғғʟɪɴᴇ"
+    worker_status = "ʀᴜɴɴɪɴɢ" if worker_info["running"] else "sᴛᴏᴘᴘᴇᴅ"
+    return (
+        f"┌─ sᴛᴀᴛᴜs\n"
+        f"├─❏ ɪᴍs : {logged_status}\n"
+        f"├─❏ ᴡᴏʀᴋᴇʀ : {worker_status}\n"
+        f"├─❏ ʟᴀsᴛ ʟᴏɢɪɴ : {worker_info['last_login']}\n"
+        f"├─❏ ᴏᴛᴘs ᴛᴏᴅᴀʏ : {worker_info['otps_today']}\n"
+        f"├─❏ ʟᴀsᴛ ᴏᴛᴘ : {worker_info['last_otp']}\n"
+        f"├─❏ ᴇʀʀᴏʀs : {worker_info['errors']}\n"
+        f"├─❏ ᴜsᴇʀs : {total_users}\n"
+        f"├─❏ ᴍᴏɴᴛʜʟʏ : {monthly_users}\n"
+        f"├─❏ sᴛᴀʀᴛᴇᴅ : {worker_info['started_at']}\n"
+        f"└─❏"
+    )
+
+
 def numbers_markup():
     return _markup([
-        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers", style="success")],
-        [_btn("ʙᴀᴄᴋ",        cb="adm_back",        style="danger")],
+        [_btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers")],
+        [_btn("ʙᴀᴄᴋ", cb="adm_back")],
     ])
 
 
@@ -1143,14 +1190,15 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if maintenance:
             await send_msg(context.bot, update.effective_chat.id, MAINT_TEXT)
             return
-        joined = await check_membership(context.bot, user.id)
-        if not joined:
-            statuses = await check_membership_per_channel(context.bot, user.id)
-            await send_msg(context.bot, update.effective_chat.id, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
-            return
+
+    joined = await check_membership(context.bot, user.id)
+    if not joined:
+        statuses = await check_membership_per_channel(context.bot, user.id)
+        await send_msg(context.bot, update.effective_chat.id, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
+        return
 
     welcome = WELCOME_ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
-    await send_msg(context.bot, update.effective_chat.id, welcome, reply_markup=main_menu_markup(user.id))
+    await send_msg(context.bot, update.effective_chat.id, welcome, reply_markup=await main_menu_markup(context.bot, user.id))
 
 
 async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1163,7 +1211,12 @@ async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     USER_STATE.pop(user.id, None)
-    await send_msg(context.bot, update.effective_chat.id, "ᴄᴀɴᴄᴇʟʟᴇᴅ.", reply_markup=main_menu_markup(user.id))
+    joined = await check_membership(context.bot, user.id)
+    if not joined:
+        statuses = await check_membership_per_channel(context.bot, user.id)
+        await send_msg(context.bot, update.effective_chat.id, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
+        return
+    await send_msg(context.bot, update.effective_chat.id, "ᴄᴀɴᴄᴇʟʟᴇᴅ.", reply_markup=await main_menu_markup(context.bot, user.id))
 
 
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1184,7 +1237,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if joined:
             await register_user(user)
             welcome = WELCOME_ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
-            await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
+            await edit_msg(query, welcome, reply_markup=await main_menu_markup(context.bot, user.id))
         else:
             statuses = await check_membership_per_channel(context.bot, user.id)
             await edit_msg(query, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
@@ -1192,8 +1245,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_back":
+        joined = await check_membership(context.bot, user.id)
+        if not joined:
+            statuses = await check_membership_per_channel(context.bot, user.id)
+            await edit_msg(query, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
+            return
         welcome = WELCOME_ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
-        await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
+        await edit_msg(query, welcome, reply_markup=await main_menu_markup(context.bot, user.id))
         return
 
     if data == "menu_admin":
@@ -1204,6 +1262,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_get_number":
+        joined = await check_membership(context.bot, user.id)
+        if not joined:
+            statuses = await check_membership_per_channel(context.bot, user.id)
+            await edit_msg(query, JOIN_TEXT, reply_markup=join_markup_dynamic(statuses))
+            return
         if not is_admin(user.id) and maintenance:
             await query.answer(MAINT_TEXT, show_alert=True)
             return
@@ -1312,6 +1375,10 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "adm_cancel_state":
         USER_STATE.pop(user.id, None)
         await edit_msg(query, "ᴄᴀɴᴄᴇʟʟᴇᴅ.", reply_markup=admin_markup())
+        return
+
+    if data == "adm_status":
+        await edit_msg(query, await status_text(), reply_markup=back_to_admin())
         return
 
     if data == "adm_numbers":
@@ -1438,10 +1505,10 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
             f"┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ ᴄʜᴏᴏsᴇ ᴍᴇᴛʜᴏᴅ\n└─❏",
             reply_markup=_markup([
                 [
-                    _btn("ᴜᴘʟᴏᴀᴅ ғɪʟᴇ",   cb="adm_addmethod_file", style="primary"),
-                    _btn("ᴛʏᴘᴇ ɴᴜᴍʙᴇʀs", cb="adm_addmethod_type", style="primary"),
+                    _btn("ᴜᴘʟᴏᴀᴅ ғɪʟᴇ",   cb="adm_addmethod_file"),
+                    _btn("ᴛʏᴘᴇ ɴᴜᴍʙᴇʀs", cb="adm_addmethod_type"),
                 ],
-                [_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger")],
+                [_btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state")],
             ]),
         )
         return
@@ -1483,10 +1550,9 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await send_msg(
             context.bot, update.effective_chat.id,
             f"┌─ ᴅᴏɴᴇ\n├─❏ ᴄᴏᴜɴᴛʀʏ : {country}\n├─❏ sᴇʀᴠɪᴄᴇ : {service}\n├─❏ ᴀᴅᴅᴇᴅ  : {count}\n├─❏ ᴅᴜᴘᴇs  : {dupes}\n└─❏",
-            reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
+            reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]),
         )
         if count > 0:
-            _, flag = get_country_info(numbers_added[0]) if numbers_added else ("", "🌐")
             flag = get_country_info(numbers_added[0])[1] if numbers_added else "🌐"
             asyncio.create_task(broadcast_stock_notification(context.application, country, flag, service, count, numbers_added))
         return
@@ -1536,10 +1602,10 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 message_id=status.message_id,
                 text=result,
                 parse_mode=ParseMode.HTML,
-                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
+                reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]),
             )
         except Exception:
-            await send_msg(context.bot, update.effective_chat.id, result, reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]))
+            await send_msg(context.bot, update.effective_chat.id, result, reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_numbers")]]))
         if count > 0:
             flag = get_country_info(numbers_added[0])[1] if numbers_added else "🌐"
             asyncio.create_task(broadcast_stock_notification(context.application, country, flag, service, count, numbers_added))
