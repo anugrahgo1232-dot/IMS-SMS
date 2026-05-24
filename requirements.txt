@@ -2,5 +2,5 @@ python-telegram-bot==22.7
 aiohttp==3.9.5
 beautifulsoup4==4.12.3
 openpyxl==3.1.2
-Pillow==10.4.0
 lxml==5.2.2
+asyncpg==0.29.0
