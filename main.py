@@ -318,19 +318,22 @@ def _markup(rows):
     return InlineKeyboardMarkup(rows)
 
 def join_gate_markup(statuses):
-    rows = []
-    pair = []
+    rows  = []
+    pair  = []
     for channel, (label, link) in CHANNEL_LABELS.items():
         joined = statuses.get(channel, False)
-        if not joined:
-            pair.append(_btn(f"⬥ {label}", url=link, style="danger"))
-            if len(pair) == 2:
-                rows.append(pair)
-                pair = []
+        if joined:
+            btn = _btn(label, cb=f"noop_joined__{channel}", style="primary")
+        else:
+            btn = _btn(label, url=link, style="danger")
+        pair.append(btn)
+        if len(pair) == 2:
+            rows.append(pair)
+            pair = []
     if pair:
         rows.append(pair)
-    rows.append([_btn("⬥ ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")])
-    rows.append([_btn("✦ ᴠᴇʀɪғʏ", cb="check_join", style="success")])
+    rows.append([_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")])
+    rows.append([_btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")])
     return _markup(rows)
 
 def main_menu_markup(user_id=None):
@@ -1192,10 +1195,10 @@ GET_NUM_TEXT = f"┌─ ɢᴇᴛ ɴᴜᴍʙᴇʀ\n├─❏ sᴇʟᴇᴄᴛ sᴇ
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await register_user(user)
+    if await is_banned_user(user.id):
+        await send_msg(context.bot, update.effective_chat.id, "ʏᴏᴜ ʜᴀᴠᴇ ʙᴇᴇɴ ʙᴀɴɴᴇᴅ.")
+        return
     if not is_admin(user.id):
-        if await is_banned_user(user.id):
-            await send_msg(context.bot, update.effective_chat.id, "ʏᴏᴜ ʜᴀᴠᴇ ʙᴇᴇɴ ʙᴀɴɴᴇᴅ.")
-            return
         if is_flooded(user.id):
             await send_msg(context.bot, update.effective_chat.id, "sʟᴏᴡ ᴅᴏᴡɴ.")
             return
@@ -1220,32 +1223,28 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data  = query.data
     await query.answer()
 
-    if not is_admin(user.id) and await is_banned_user(user.id) and data != "check_join":
+    if await is_banned_user(user.id) and data not in ("check_join",):
         await query.answer("ʙᴀɴɴᴇᴅ.", show_alert=True)
         return
 
-    if data != "check_join":
-        statuses = await check_membership_per_channel(context.bot, user.id)
-        all_joined = all(statuses.values())
-        if not all_joined:
-            await edit_msg(query, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
-            await query.answer("ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟs ғɪʀsᴛ.", show_alert=True)
-            return
-
     if data == "check_join":
-        joined = await check_membership(context.bot, user.id)
-        if joined:
+        statuses  = await check_membership_per_channel(context.bot, user.id)
+        all_joined = all(statuses.values())
+        if all_joined:
             await register_user(user)
             welcome = ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
             await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
         else:
-            statuses = await check_membership_per_channel(context.bot, user.id)
             await edit_msg(query, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
             await query.answer("ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟs ғɪʀsᴛ.", show_alert=True)
         return
 
+    if data.startswith("noop_joined__"):
+        await query.answer("ᴀʟʀᴇᴀᴅʏ ᴊᴏɪɴᴇᴅ.", show_alert=False)
+        return
+
     if data == "menu_back":
-        statuses = await check_membership_per_channel(context.bot, user.id)
+        statuses   = await check_membership_per_channel(context.bot, user.id)
         all_joined = all(statuses.values())
         if not all_joined:
             await edit_msg(query, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
@@ -1262,6 +1261,11 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if data == "menu_get_number":
+        statuses   = await check_membership_per_channel(context.bot, user.id)
+        all_joined = all(statuses.values())
+        if not all_joined:
+            await edit_msg(query, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
+            return
         if not is_admin(user.id) and maintenance:
             await query.answer("ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ.", show_alert=True)
             return
@@ -1468,56 +1472,33 @@ async def _insert_numbers_bulk(service: str, result: dict):
     by_country  = {}
 
     pool = await get_pool()
-
-    for iso, v in result["groups"].items():
-        country = v["name"]
-        flag    = v["flag"]
-        nums    = v["numbers"]
-        if not nums:
-            continue
-        async with pool.acquire() as conn:
-            existing = await conn.fetch(
-                "SELECT number FROM numbers WHERE number = ANY($1::text[])",
-                nums,
-            )
-            existing_set = {r["number"] for r in existing}
-            new_nums = [n for n in nums if n not in existing_set]
-            dupes    = len(nums) - len(new_nums)
-            total_dupes += dupes
-            if new_nums:
-                await conn.execute(
-                    """
-                    INSERT INTO numbers (country, flag, number, service)
-                    SELECT $1, $2, unnest($3::text[]), $4
-                    ON CONFLICT (number) DO NOTHING
-                    """,
-                    country, flag, new_nums, service,
+    async with pool.acquire() as conn:
+        for iso, v in result["groups"].items():
+            country   = v["name"]
+            flag      = v["flag"]
+            added_for = []
+            for num in v["numbers"]:
+                r = await conn.execute(
+                    "INSERT INTO numbers (country,flag,number,service) VALUES ($1,$2,$3,$4) ON CONFLICT (number) DO NOTHING",
+                    country, flag, num, service,
                 )
-                total_added += len(new_nums)
-                by_country[iso] = {"name": country, "flag": flag, "numbers": new_nums}
-        await asyncio.sleep(0)
+                if r == "INSERT 0 1":
+                    total_added += 1
+                    added_for.append(num)
+                else:
+                    total_dupes += 1
+            if added_for:
+                by_country[iso] = {"name": country, "flag": flag, "numbers": added_for}
 
-    if result["unknown"]:
-        unknown = result["unknown"]
-        async with pool.acquire() as conn:
-            existing = await conn.fetch(
-                "SELECT number FROM numbers WHERE number = ANY($1::text[])",
-                unknown,
+        for num in result["unknown"]:
+            r = await conn.execute(
+                "INSERT INTO numbers (country,flag,number,service) VALUES ($1,$2,$3,$4) ON CONFLICT (number) DO NOTHING",
+                "Unknown", "🌐", num, service,
             )
-            existing_set = {r["number"] for r in existing}
-            new_nums = [n for n in unknown if n not in existing_set]
-            total_dupes += len(unknown) - len(new_nums)
-            if new_nums:
-                await conn.execute(
-                    """
-                    INSERT INTO numbers (country, flag, number, service)
-                    SELECT 'Unknown', '🌐', unnest($1::text[]), $2
-                    ON CONFLICT (number) DO NOTHING
-                    """,
-                    new_nums, service,
-                )
-                total_added += len(new_nums)
-        await asyncio.sleep(0)
+            if r == "INSERT 0 1":
+                total_added += 1
+            else:
+                total_dupes += 1
 
     return total_added, total_dupes, by_country
 
@@ -1554,19 +1535,9 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         lines      = [re.sub(r"\D", "", line) for line in text.splitlines()]
         lines      = [n for n in lines if 7 <= len(n) <= 15]
         raw        = "\n".join(lines).encode("utf-8")
-        status_msg = await send_msg(context.bot, update.effective_chat.id, "⏳ ᴘᴀʀsɪɴɢ ɴᴜᴍʙᴇʀs...")
         loop       = asyncio.get_event_loop()
         result     = await loop.run_in_executor(None, extract_numbers_smart, raw, "numbers.txt")
-        total_raw  = result["total"]
-        try:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=status_msg.message_id,
-                text=f"⏳ ɪɴsᴇʀᴛɪɴɢ {total_raw} ɴᴜᴍʙᴇʀs...",
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception:
-            pass
+        status_msg = await send_msg(context.bot, update.effective_chat.id, "ᴘʀᴏᴄᴇssɪɴɢ...")
 
         total_added, total_dupes, by_country = await _insert_numbers_bulk(service, result)
         USER_STATE.pop(user.id, None)
@@ -1611,32 +1582,14 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_msg(context.bot, update.effective_chat.id, "ɪɴᴠᴀʟɪᴅ ғɪʟᴇ. ᴜsᴇ .ᴛxᴛ .ᴄsᴠ .xʟsx .xʟs")
         return
 
-    status_msg = await send_msg(context.bot, update.effective_chat.id, "⏳ ᴅᴏᴡɴʟᴏᴀᴅɪɴɢ ғɪʟᴇ...")
+    status_msg = await send_msg(context.bot, update.effective_chat.id, "ᴘʀᴏᴄᴇssɪɴɢ...")
     USER_STATE.pop(user.id, None)
 
     try:
-        f        = await doc.get_file()
-        content  = bytes(await f.download_as_bytearray())
-        try:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=status_msg.message_id,
-                text="⏳ ᴘᴀʀsɪɴɢ ɴᴜᴍʙᴇʀs...",
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception:
-            pass
+        f       = await doc.get_file()
+        content = bytes(await f.download_as_bytearray())
         loop    = asyncio.get_event_loop()
         result  = await loop.run_in_executor(None, extract_numbers_smart, content, name)
-        try:
-            await context.bot.edit_message_text(
-                chat_id=update.effective_chat.id,
-                message_id=status_msg.message_id,
-                text=f"⏳ ɪɴsᴇʀᴛɪɴɢ {result['total']} ɴᴜᴍʙᴇʀs...",
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception:
-            pass
 
         total_added, total_dupes, by_country = await _insert_numbers_bulk(service, result)
 
