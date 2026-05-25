@@ -852,13 +852,31 @@ class PanelSession:
                     timeout=aiohttp.ClientTimeout(total=20),
                 ) as redir:
                     final_url = str(redir.url)
-                    logger.info(f"Post-login final url: {final_url}")
+                    logger.info(f"Post-login final: {final_url}")
                     if "login" in final_url.lower():
                         logger.error("Session rejected after redirect")
                         self._login_backoff = min(self._login_backoff * 2, 3600)
                         worker_info["login_errors"] += 1
                         return False
-                    html = await redir.text(errors="replace")
+
+            async with sess.get(
+                PANEL_CDR_URL,
+                allow_redirects=True,
+                headers={
+                    "Referer":        f"{PANEL_BASE}/client/SMSDashboard",
+                    "Sec-Fetch-Site": "same-origin",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-Dest": "document",
+                },
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as cdr_resp:
+                cdr_final = str(cdr_resp.url)
+                if "login" in cdr_final.lower():
+                    logger.error("CDR redirect to login — session invalid")
+                    self._login_backoff = min(self._login_backoff * 2, 3600)
+                    worker_info["login_errors"] += 1
+                    return False
+                cdr_html = await cdr_resp.text(errors="replace")
 
             self._logged_in     = True
             self._login_backoff = LOGIN_MIN_INTERVAL
@@ -867,7 +885,7 @@ class PanelSession:
             worker_info["last_login"]   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             worker_info["logged_in"]    = True
 
-            await self._extract_sesskey(html)
+            await self._extract_sesskey(cdr_html)
             logger.info(f"Panel login OK — sesskey={'yes' if self._sesskey else 'no'}")
             return True
 
@@ -923,30 +941,66 @@ class PanelSession:
 
     async def fetch_cdr(self):
         try:
-            sess   = await self._get_session()
+            sess  = await self._get_session()
+            today = datetime.now().strftime("%Y-%m-%d")
             params = {
-                "sEcho":         "1",
-                "iColumns":      "7",
-                "sColumns":      ".......",
-                "iDisplayStart": "0",
-                "iDisplayLength":"25",
-                "mDataProp_0":   "0",
-                "mDataProp_1":   "1",
-                "mDataProp_2":   "2",
-                "mDataProp_3":   "3",
-                "mDataProp_4":   "4",
-                "mDataProp_5":   "5",
-                "mDataProp_6":   "6",
-                "bSortable_0":   "true",
-                "bSortable_1":   "true",
-                "bSortable_2":   "true",
-                "bSortable_3":   "true",
-                "bSortable_4":   "true",
-                "bSortable_5":   "true",
-                "bSortable_6":   "true",
-                "iSortCol_0":    "0",
-                "sSortDir_0":    "desc",
-                "iSortingCols":  "1",
+                "fdate1":          f"{today} 00:00:00",
+                "fdate2":          f"{today} 23:59:59",
+                "frange":          "",
+                "fnum":            "",
+                "fcli":            "",
+                "fgdate":          "",
+                "fgmonth":         "",
+                "fgrange":         "",
+                "fgnumber":        "",
+                "fgcli":           "",
+                "fg":              "0",
+                "sEcho":           "1",
+                "iColumns":        "7",
+                "sColumns":        ".......",
+                "iDisplayStart":   "0",
+                "iDisplayLength":  "25",
+                "mDataProp_0":     "0",
+                "sSearch_0":       "",
+                "bRegex_0":        "false",
+                "bSearchable_0":   "true",
+                "bSortable_0":     "true",
+                "mDataProp_1":     "1",
+                "sSearch_1":       "",
+                "bRegex_1":        "false",
+                "bSearchable_1":   "true",
+                "bSortable_1":     "true",
+                "mDataProp_2":     "2",
+                "sSearch_2":       "",
+                "bRegex_2":        "false",
+                "bSearchable_2":   "true",
+                "bSortable_2":     "true",
+                "mDataProp_3":     "3",
+                "sSearch_3":       "",
+                "bRegex_3":        "false",
+                "bSearchable_3":   "true",
+                "bSortable_3":     "true",
+                "mDataProp_4":     "4",
+                "sSearch_4":       "",
+                "bRegex_4":        "false",
+                "bSearchable_4":   "true",
+                "bSortable_4":     "true",
+                "mDataProp_5":     "5",
+                "sSearch_5":       "",
+                "bRegex_5":        "false",
+                "bSearchable_5":   "true",
+                "bSortable_5":     "true",
+                "mDataProp_6":     "6",
+                "sSearch_6":       "",
+                "bRegex_6":        "false",
+                "bSearchable_6":   "true",
+                "bSortable_6":     "true",
+                "sSearch":         "",
+                "bRegex":          "false",
+                "iSortCol_0":      "0",
+                "sSortDir_0":      "desc",
+                "iSortingCols":    "1",
+                "_":               str(int(time.time() * 1000)),
             }
             if self._sesskey:
                 params["sesskey"] = self._sesskey
@@ -1043,6 +1097,8 @@ async def sms_worker(app):
                 startup_rows, _ = await panel.fetch_cdr()
                 if startup_rows:
                     for r in startup_rows:
+                        if not r.get('number') or not r.get('sms'):
+                            continue
                         h = hashlib.md5(f"{r['date']}{r['number']}{r['sms']}".encode()).hexdigest()
                         otp_cache.add(h)
                     logger.info(f"Startup cache: {len(startup_rows)} rows")
@@ -1077,7 +1133,10 @@ async def sms_worker(app):
                         date   = row.get("date", "").strip()
                         if not sms or not number:
                             continue
-                        if not re.sub(r"[Xx\s\-_*]", "", sms):
+                        clean_num = re.sub(r"\D", "", number)
+                        if not clean_num or len(clean_num) < 5:
+                            continue
+                        if not re.sub(r"[Xx\s\-_*0]", "", sms):
                             continue
                         otp = extract_otp(sms)
                         if not otp:
