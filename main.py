@@ -833,46 +833,37 @@ class PanelSession:
                 location = resp.headers.get("Location", "")
                 logger.info(f"Signin: status={resp.status} location={location}")
 
-                if resp.status not in (301, 302) or "login" in location.lower():
-                    logger.error(f"Login rejected: status={resp.status} location={location}")
+                if resp.status not in (301, 302):
+                    logger.error(f"Login not redirected: status={resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
 
-                if location.startswith("http"):
-                    redirect_url = location
-                elif location.startswith("/"):
-                    redirect_url = f"{PANEL_BASE}{location}"
-                else:
-                    redirect_url = f"{PANEL_BASE}/"
+                if "login" in location.lower():
+                    logger.error(f"Login rejected by panel — redirected back to login (Frequent Login ban?)")
+                    self._login_backoff = min(self._login_backoff * 2, 3600)
+                    worker_info["login_errors"] += 1
+                    return False
 
-                async with sess.get(
-                    redirect_url,
-                    allow_redirects=True,
-                    timeout=aiohttp.ClientTimeout(total=20),
-                ) as redir:
-                    final_url = str(redir.url)
-                    logger.info(f"Post-login final: {final_url}")
-                    if "login" in final_url.lower():
-                        logger.error("Session rejected after redirect")
-                        self._login_backoff = min(self._login_backoff * 2, 3600)
-                        worker_info["login_errors"] += 1
-                        return False
+            await asyncio.sleep(1)
 
             async with sess.get(
                 PANEL_CDR_URL,
                 allow_redirects=True,
                 headers={
-                    "Referer":        f"{PANEL_BASE}/client/SMSDashboard",
+                    "Referer":        PANEL_LOGIN_PAGE,
                     "Sec-Fetch-Site": "same-origin",
                     "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-User": "?1",
                     "Sec-Fetch-Dest": "document",
                 },
-                timeout=aiohttp.ClientTimeout(total=20),
+                timeout=aiohttp.ClientTimeout(total=30),
             ) as cdr_resp:
                 cdr_final = str(cdr_resp.url)
+                cdr_status = cdr_resp.status
+                logger.info(f"CDR after login: status={cdr_status} url={cdr_final}")
                 if "login" in cdr_final.lower():
-                    logger.error("CDR redirect to login — session invalid")
+                    logger.error(f"CDR redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -1673,7 +1664,7 @@ async def post_init(application):
     await web.TCPSite(runner, "0.0.0.0", PORT).start()
     logger.info(f"Health on :{PORT}")
 
-    application.create_task(sms_worker(application))
+    asyncio.get_event_loop().create_task(sms_worker(application))
     logger.info(f"{BOT_NAME} live")
 
 
