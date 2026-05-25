@@ -10,8 +10,7 @@ import aiohttp
 import phonenumbers
 import pycountry
 import pandas as pd
-import openpyxl
-from phonenumbers import region_code_for_number, country_code_for_region
+from phonenumbers import region_code_for_number
 from datetime import datetime
 from io import BytesIO
 from bs4 import BeautifulSoup
@@ -35,7 +34,7 @@ from telegram.ext import (
     ContextTypes,
 )
 
-BOT_TOKEN           = "8313925262:AAFWhXOIG5edYgZPtcsVDUEDyPfNTdWLBWw"
+BOT_TOKEN           = "8313925262:AAFBgY13zTdARtEuWuIdFp8-rKac6DopNjU"
 BOT_NAME            = "ᴍʀ.ᴀғʀɪx"
 BOT_USERNAME        = "mrafrix_bot"
 BOT_LINK            = "https://t.me/mrafrix_bot"
@@ -64,13 +63,13 @@ FORCE_CHANNELS      = ["@sage_xd", "@mr_afrix", "@oxellabs", "@oracron"]
 
 STOCK_NOTIFY_CHANNEL_ID = -1002506491665
 
-DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
-PORT                = int(os.environ.get("PORT", 8080))
-POLL_INTERVAL       = 5
-KEEPALIVE_INTERVAL  = 60
-FLOOD_LIMIT         = 5
-FLOOD_WINDOW        = 10
-NUMBER_COOLDOWN     = 30
+DATABASE_URL     = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
+PORT             = int(os.environ.get("PORT", 8080))
+POLL_INTERVAL    = 5
+KEEPALIVE_INTERVAL = 60
+FLOOD_LIMIT      = 5
+FLOOD_WINDOW     = 10
+NUMBER_COOLDOWN  = 30
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -113,8 +112,8 @@ DEFAULT_SERVICES = [
 ]
 
 _SC = str.maketrans(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-    "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘqʀꜱᴛᴜᴠᴡxʏᴢᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘqʀꜱᴛᴜᴠᴡxʏᴢ0123456789"
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘqʀꜱᴛᴜᴠᴡxʏᴢᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘqʀꜱᴛᴜᴠᴡxʏᴢ"
 )
 
 def sc(t: str) -> str:
@@ -131,6 +130,19 @@ def iso_to_name(iso: str) -> str:
         return pycountry.countries.get(alpha_2=iso).name
     except Exception:
         return iso
+
+def btn(text, *, cb=None, url=None, style=None):
+    kwargs = {}
+    if url is not None:
+        kwargs["url"] = url
+    elif cb is not None:
+        kwargs["callback_data"] = cb
+    if style is not None:
+        kwargs["style"] = style
+    return InlineKeyboardButton(text, **kwargs)
+
+def mk(rows):
+    return InlineKeyboardMarkup(rows)
 
 _db_pool = None
 _db_lock = None
@@ -209,8 +221,8 @@ async def init_db():
                 use_date TIMESTAMP DEFAULT NULL
             );
             CREATE TABLE IF NOT EXISTS cooldowns (
-                user_id   BIGINT PRIMARY KEY,
-                ts        BIGINT
+                user_id BIGINT PRIMARY KEY,
+                ts      BIGINT
             );
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
@@ -236,14 +248,6 @@ async def set_setting(key, value):
         key, value,
     )
 
-def _btn(text, *, cb=None, url=None):
-    if url is not None:
-        return InlineKeyboardButton(text, url=url)
-    return InlineKeyboardButton(text, callback_data=cb)
-
-def _markup(rows):
-    return InlineKeyboardMarkup(rows)
-
 def parse_phone(raw: str):
     clean = re.sub(r"\D", "", str(raw))
     if not (7 <= len(clean) <= 15):
@@ -253,11 +257,30 @@ def parse_phone(raw: str):
         iso = region_code_for_number(p)
         if not iso:
             return clean, "Unknown", "🌐"
-        name = iso_to_name(iso)
-        flag = iso_to_flag(iso)
-        return clean, name, flag
+        return clean, iso_to_name(iso), iso_to_flag(iso)
     except Exception:
         return clean, "Unknown", "🌐"
+
+def get_country_info(number):
+    _, name, flag = parse_phone(re.sub(r"\D", "", str(number)))
+    return name or "Unknown", flag or "🌐"
+
+def mask_number(number):
+    clean = re.sub(r"\D", "", str(number))
+    if len(clean) >= 9:
+        return f"+{clean[:5]}····{clean[-3:]}"
+    if len(clean) >= 6:
+        return f"+{clean[:3]}···{clean[-3:]}"
+    return f"+{clean}···"
+
+def extract_otp(sms):
+    if not sms:
+        return None
+    for pattern in (r"\b\d{3}[-\s]\d{3}\b", r"\b\d{6,8}\b", r"\b\d{4,5}\b"):
+        m = re.search(pattern, sms)
+        if m:
+            return m.group().strip()
+    return None
 
 def detect_number_column(df: pd.DataFrame) -> str:
     priority = {"number", "phone", "phone number", "msisdn", "mobile", "tel", "telephone", "num", "numbers"}
@@ -272,9 +295,9 @@ def detect_number_column(df: pd.DataFrame) -> str:
     return df.columns[0]
 
 def load_numbers_file(data: bytes, filename: str) -> list:
-    name = filename.lower()
     nums = []
     try:
+        name = filename.lower()
         if name.endswith(".xlsx"):
             df  = pd.read_excel(BytesIO(data), engine="openpyxl")
             col = detect_number_column(df)
@@ -288,8 +311,7 @@ def load_numbers_file(data: bytes, filename: str) -> list:
             col = detect_number_column(df)
             raw = df[col].dropna().astype(str).tolist()
         else:
-            text = data.decode("utf-8", errors="ignore")
-            raw  = text.splitlines()
+            raw = data.decode("utf-8", errors="ignore").splitlines()
         for r in raw:
             clean = re.sub(r"\D", "", r.strip())
             if 7 <= len(clean) <= 15:
@@ -298,31 +320,29 @@ def load_numbers_file(data: bytes, filename: str) -> list:
         logger.error(f"File load error: {e}")
     return nums
 
-def get_country_info(number):
-    clean = re.sub(r"\D", "", str(number))
-    _, name, flag = parse_phone(clean)
-    return name or "Unknown", flag or "🌐"
+def _process_numbers_sync(data: bytes, filename: str) -> dict:
+    nums   = load_numbers_file(data, filename)
+    seen   = set()
+    groups = {}
+    dupes  = 0
+    for raw in nums:
+        clean = re.sub(r"\D", "", raw)
+        if not (7 <= len(clean) <= 15):
+            continue
+        if clean in seen:
+            dupes += 1
+            continue
+        seen.add(clean)
+        _, cname, flag = parse_phone(clean)
+        key = cname or "Unknown"
+        if key not in groups:
+            groups[key] = {"flag": flag or "🌐", "numbers": []}
+        groups[key]["numbers"].append(clean)
+    return {"groups": groups, "dupes": dupes, "total": len(nums)}
 
-def mask_number(number):
-    clean = re.sub(r"\D", "", str(number))
-    if len(clean) >= 9:
-        return f"+{clean[:5]}····{clean[-3:]}"
-    if len(clean) >= 6:
-        return f"+{clean[:3]}···{clean[-3:]}"
-    return f"+{clean}···"
-
-def extract_otp(sms):
-    if not sms:
-        return None
-    for pattern in (
-        r"\b\d{3}[-\s]\d{3}\b",
-        r"\b\d{6,8}\b",
-        r"\b\d{4,5}\b",
-    ):
-        m = re.search(pattern, sms)
-        if m:
-            return m.group().strip()
-    return None
+async def process_numbers_async(data: bytes, filename: str) -> dict:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _process_numbers_sync, data, filename)
 
 def is_admin(user_id):
     return user_id in ADMIN_IDS
@@ -385,11 +405,10 @@ async def set_number_cooldown(user_id):
 async def get_monthly_users():
     now            = datetime.now()
     first_of_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    count          = await db_fetchval(
+    return await db_fetchval(
         "SELECT COUNT(*) FROM users WHERE joined_at >= $1 AND is_banned=FALSE",
         first_of_month,
-    )
-    return count or 0
+    ) or 0
 
 def join_markup_dynamic(statuses):
     rows = []
@@ -397,22 +416,20 @@ def join_markup_dynamic(statuses):
     for channel, (label, link) in CHANNEL_LABELS.items():
         joined = statuses.get(channel, False)
         if joined:
-            btn = InlineKeyboardButton(f"🔵 {label}", callback_data=f"joined_noop__{channel}")
+            b = btn(label, cb=f"joined_noop__{channel}", style="primary")
         else:
-            btn = InlineKeyboardButton(f"🔴 {label}", url=link)
-        pair.append(btn)
+            b = btn(label, url=link, style="danger")
+        pair.append(b)
         if len(pair) == 2:
             rows.append(pair)
             pair = []
     if pair:
         rows.append(pair)
-    rows.append([InlineKeyboardButton("🟢 ᴠᴇʀɪғʏ", callback_data="check_join")])
-    return _markup(rows)
+    rows.append([btn("ᴠᴇʀɪғʏ", cb="check_join", style="success")])
+    return mk(rows)
 
 async def main_menu_markup(bot, user_id=None):
-    rows = [
-        [InlineKeyboardButton("🟢 ɢᴇᴛ ɴᴜᴍʙᴇʀ", callback_data="menu_get_number")],
-    ]
+    rows = [[btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", cb="menu_get_number", style="success")]]
     if user_id:
         statuses = await check_membership_per_channel(bot, user_id)
         unjoined = [
@@ -422,75 +439,63 @@ async def main_menu_markup(bot, user_id=None):
         ]
         pair = []
         for label, link in unjoined:
-            pair.append(InlineKeyboardButton(f"🔴 {label}", url=link))
+            pair.append(btn(label, url=link, style="danger"))
             if len(pair) == 2:
                 rows.append(pair)
                 pair = []
         if pair:
             rows.append(pair)
-    rows.append([InlineKeyboardButton("🔵 ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK)])
+    rows.append([btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")])
     if user_id and is_admin(user_id):
-        rows.append([InlineKeyboardButton("🔴 ᴀᴅᴍɪɴ", callback_data="menu_admin")])
-    return _markup(rows)
+        rows.append([btn("ᴀᴅᴍɪɴ", cb="menu_admin", style="danger")])
+    return mk(rows)
 
 def otp_markup():
-    return _markup([
-        [
-            InlineKeyboardButton("🟢 ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK),
-            InlineKeyboardButton("🔵 ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK),
-        ],
-        [
-            InlineKeyboardButton("🔵 ᴏxᴇʟʟᴀʙs", url=THIRD_CHANNEL_LINK),
-            InlineKeyboardButton("🔵 ᴏʀᴀᴄʀᴏɴ",  url=FOURTH_CHANNEL_LINK),
-        ],
-        [InlineKeyboardButton("🔵 sᴀɢᴇ", url=MAIN_CHANNEL_LINK)],
+    return mk([
+        [btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,           style="success"),
+         btn("ᴍʀᴀғʀɪx",     url=BACKUP_CHANNEL_LINK, style="primary")],
+        [btn("ᴏxᴇʟʟᴀʙs",    url=THIRD_CHANNEL_LINK,  style="primary"),
+         btn("ᴏʀᴀᴄʀᴏɴ",     url=FOURTH_CHANNEL_LINK, style="primary")],
+        [btn("sᴀɢᴇ",         url=MAIN_CHANNEL_LINK,   style="primary")],
     ])
 
 def stock_notification_markup():
-    return _markup([
-        [
-            InlineKeyboardButton("🟢 ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK),
-            InlineKeyboardButton("🔵 ᴏᴛᴘ ɢʀᴏᴜᴘ",   url=OTP_GROUP_LINK),
-        ],
+    return mk([
+        [btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ", url=BOT_LINK,      style="success"),
+         btn("ᴏᴛᴘ ɢʀᴏᴜᴘ",   url=OTP_GROUP_LINK, style="primary")],
     ])
 
 def number_assigned_markup(country, service, num_id):
-    return _markup([
-        [InlineKeyboardButton("🔄 ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", callback_data=f"chgn__{country}__{service}__{num_id}")],
-        [
-            InlineKeyboardButton("🔵 ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK),
-            InlineKeyboardButton("🔴 ʙᴀᴄᴋ",     callback_data="menu_back"),
-        ],
+    return mk([
+        [btn("ᴄʜᴀɴɢᴇ ɴᴜᴍʙᴇʀ", cb=f"chgn__{country}__{service}__{num_id}", style="primary")],
+        [btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary"),
+         btn("ʙᴀᴄᴋ",       cb="menu_back",      style="danger")],
     ])
 
 def admin_markup():
-    return _markup([
-        [
-            InlineKeyboardButton("🟢 ᴀᴅᴅ ɴᴜᴍʙᴇʀs",    callback_data="adm_numbers"),
-            InlineKeyboardButton("🔴 ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs", callback_data="adm_delete_numbers"),
-        ],
-        [InlineKeyboardButton("🔵 sᴛᴀᴛᴜs", callback_data="adm_status")],
-        [InlineKeyboardButton("🔴 ʙᴀᴄᴋ",   callback_data="menu_back")],
+    return mk([
+        [btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs",    cb="adm_numbers",        style="success"),
+         btn("ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀs", cb="adm_delete_numbers", style="danger")],
+        [btn("sᴛᴀᴛᴜs", cb="adm_status",  style="primary")],
+        [btn("ʙᴀᴄᴋ",   cb="menu_back",   style="danger")],
     ])
 
 def back_to_menu():
-    return _markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="menu_back")]])
+    return mk([[btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
 
 def back_to_admin():
-    return _markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="adm_back")]])
+    return mk([[btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]])
 
 def cancel_state_markup(back_cb="adm_back"):
-    return _markup([
-        [
-            InlineKeyboardButton("🔴 ᴄᴀɴᴄᴇʟ", callback_data="adm_cancel_state"),
-            InlineKeyboardButton("🔴 ʙᴀᴄᴋ",   callback_data=back_cb),
-        ]
-    ])
+    return mk([[
+        btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger"),
+        btn("ʙᴀᴄᴋ",   cb=back_cb,             style="danger"),
+    ]])
 
 def numbers_markup():
-    return _markup([
-        [InlineKeyboardButton("🟢 ᴀᴅᴅ ɴᴜᴍʙᴇʀs", callback_data="adm_add_numbers")],
-        [InlineKeyboardButton("🔴 ʙᴀᴄᴋ",         callback_data="adm_back")],
+    return mk([
+        [btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀs", cb="adm_add_numbers", style="success")],
+        [btn("ʙᴀᴄᴋ",         cb="adm_back",         style="danger")],
     ])
 
 async def build_service_grid():
@@ -500,16 +505,16 @@ async def build_service_grid():
     if not rows:
         return None, None
     buttons = []
-    row_buf = []
+    pair    = []
     for r in rows:
-        row_buf.append(InlineKeyboardButton(f"🟢 {sc(r['service'])}", callback_data=f"gns__{r['service']}"))
-        if len(row_buf) == 2:
-            buttons.append(row_buf)
-            row_buf = []
-    if row_buf:
-        buttons.append(row_buf)
-    buttons.append([InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="menu_back")])
-    return rows, _markup(buttons)
+        pair.append(btn(sc(r["service"]), cb=f"gns__{r['service']}", style="success"))
+        if len(pair) == 2:
+            buttons.append(pair)
+            pair = []
+    if pair:
+        buttons.append(pair)
+    buttons.append([btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")])
+    return rows, mk(buttons)
 
 async def build_country_grid_for_service(service):
     rows = await db_fetchall(
@@ -520,17 +525,16 @@ async def build_country_grid_for_service(service):
     if not rows:
         return None, None
     buttons = []
-    row_buf = []
+    pair    = []
     for r in rows:
-        label = f"{r['flag']} {sc(r['country'])}"
-        row_buf.append(InlineKeyboardButton(label, callback_data=f"gnc__{r['country']}__{service}"))
-        if len(row_buf) == 2:
-            buttons.append(row_buf)
-            row_buf = []
-    if row_buf:
-        buttons.append(row_buf)
-    buttons.append([InlineKeyboardButton(f"🔴 ʙᴀᴄᴋ", callback_data=f"gns__{service}")])
-    return rows, _markup(buttons)
+        pair.append(btn(f"{r['flag']} {sc(r['country'])}", cb=f"gnc__{r['country']}__{service}", style="primary"))
+        if len(pair) == 2:
+            buttons.append(pair)
+            pair = []
+    if pair:
+        buttons.append(pair)
+    buttons.append([btn("ʙᴀᴄᴋ", cb=f"gns__{service}", style="danger")])
+    return rows, mk(buttons)
 
 async def build_delete_service_grid():
     rows = await db_fetchall(
@@ -539,17 +543,17 @@ async def build_delete_service_grid():
     if not rows:
         return None, None
     buttons = []
-    row_buf = []
+    pair    = []
     for r in rows:
-        row_buf.append(InlineKeyboardButton(f"🔴 {sc(r['service'])}", callback_data=f"del_svc__{r['service']}"))
-        if len(row_buf) == 2:
-            buttons.append(row_buf)
-            row_buf = []
-    if row_buf:
-        buttons.append(row_buf)
-    buttons.append([InlineKeyboardButton("🔴 ᴀʟʟ sᴇʀᴠɪᴄᴇs", callback_data="del_svc__ALL")])
-    buttons.append([InlineKeyboardButton("🔴 ʙᴀᴄᴋ",           callback_data="adm_back")])
-    return rows, _markup(buttons)
+        pair.append(btn(sc(r["service"]), cb=f"del_svc__{r['service']}", style="danger"))
+        if len(pair) == 2:
+            buttons.append(pair)
+            pair = []
+    if pair:
+        buttons.append(pair)
+    buttons.append([btn("ᴀʟʟ sᴇʀᴠɪᴄᴇs", cb="del_svc__ALL", style="danger")])
+    buttons.append([btn("ʙᴀᴄᴋ",           cb="adm_back",     style="danger")])
+    return rows, mk(buttons)
 
 async def build_delete_country_grid(service):
     if service == "ALL":
@@ -558,43 +562,42 @@ async def build_delete_country_grid(service):
         )
     else:
         rows = await db_fetchall(
-            "SELECT country, flag, COUNT(*) AS cnt FROM numbers WHERE service=$1 GROUP BY country, flag ORDER BY country",
+            "SELECT country, flag, COUNT(*) AS cnt FROM numbers WHERE service=$1 "
+            "GROUP BY country, flag ORDER BY country",
             service,
         )
     if not rows:
         return None, None
     buttons = []
-    row_buf = []
+    pair    = []
     for r in rows:
-        label = f"{r['flag']} {sc(r['country'])}"
-        row_buf.append(InlineKeyboardButton(label, callback_data=f"del_cntry__{service}__{r['country']}"))
-        if len(row_buf) == 2:
-            buttons.append(row_buf)
-            row_buf = []
-    if row_buf:
-        buttons.append(row_buf)
-    buttons.append([InlineKeyboardButton("🔴 ᴀʟʟ ᴄᴏᴜɴᴛʀɪᴇs", callback_data=f"del_cntry__{service}__ALL")])
-    buttons.append([InlineKeyboardButton("🔴 ʙᴀᴄᴋ",            callback_data="adm_delete_numbers")])
-    return rows, _markup(buttons)
+        pair.append(btn(f"{r['flag']} {sc(r['country'])}", cb=f"del_cntry__{service}__{r['country']}", style="danger"))
+        if len(pair) == 2:
+            buttons.append(pair)
+            pair = []
+    if pair:
+        buttons.append(pair)
+    buttons.append([btn("ᴀʟʟ ᴄᴏᴜɴᴛʀɪᴇs", cb=f"del_cntry__{service}__ALL", style="danger")])
+    buttons.append([btn("ʙᴀᴄᴋ",            cb="adm_delete_numbers",         style="danger")])
+    return rows, mk(buttons)
 
-def _service_picker_markup():
+def service_picker_markup():
     buttons = []
-    row_buf = []
+    pair    = []
     for svc in DEFAULT_SERVICES:
-        row_buf.append(InlineKeyboardButton(sc(svc), callback_data=f"adm_svc__{svc}"))
-        if len(row_buf) == 3:
-            buttons.append(row_buf)
-            row_buf = []
-    if row_buf:
-        buttons.append(row_buf)
-    buttons.append([InlineKeyboardButton("🟢 ᴄᴜsᴛᴏᴍ", callback_data="adm_svc_custom")])
-    buttons.append([InlineKeyboardButton("🔴 ᴄᴀɴᴄᴇʟ", callback_data="adm_cancel_state")])
-    return _markup(buttons)
+        pair.append(btn(sc(svc), cb=f"adm_svc__{svc}", style="primary"))
+        if len(pair) == 2:
+            buttons.append(pair)
+            pair = []
+    if pair:
+        buttons.append(pair)
+    buttons.append([btn("ᴄᴜsᴛᴏᴍ", cb="adm_svc_custom",    style="success")])
+    buttons.append([btn("ᴄᴀɴᴄᴇʟ", cb="adm_cancel_state", style="danger")])
+    return mk(buttons)
 
 async def send_msg(bot, chat_id, text, reply_markup=None):
     return await bot.send_message(
-        chat_id=chat_id,
-        text=text,
+        chat_id=chat_id, text=text,
         parse_mode=ParseMode.HTML,
         reply_markup=reply_markup,
         disable_web_page_preview=True,
@@ -603,8 +606,7 @@ async def send_msg(bot, chat_id, text, reply_markup=None):
 async def edit_msg(query, text, reply_markup=None):
     try:
         await query.edit_message_text(
-            text=text,
-            parse_mode=ParseMode.HTML,
+            text=text, parse_mode=ParseMode.HTML,
             reply_markup=reply_markup,
             disable_web_page_preview=True,
         )
@@ -616,7 +618,8 @@ async def notify_admins(app, text):
         try:
             await app.bot.send_message(
                 chat_id=aid, text=text,
-                parse_mode=ParseMode.HTML, disable_web_page_preview=True,
+                parse_mode=ParseMode.HTML,
+                disable_web_page_preview=True,
             )
         except Exception:
             pass
@@ -624,17 +627,16 @@ async def notify_admins(app, text):
 async def broadcast_stock_notification(app, groups: dict):
     markup = stock_notification_markup()
     for country, data in groups.items():
-        flag    = data["flag"]
-        service = data["service"]
-        nums    = data["numbers"]
-        count   = len(nums)
-        filename = f"{flag} {country} — {sc(service)}.txt".replace("/", "-")
+        flag       = data["flag"]
+        service    = data["service"]
+        nums       = data["numbers"]
+        filename   = f"{flag} {country} — {sc(service)}.txt".replace("/", "-")
         file_bytes = "\n".join(nums).encode("utf-8")
-        caption = (
+        caption    = (
             f"┌─ ɴᴇᴡ sᴛᴏᴄᴋ ᴀᴅᴅᴇᴅ\n"
             f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country)}\n"
             f"├─❏ sᴇʀᴠɪᴄᴇ  : {sc(service)}\n"
-            f"├─❏ ɴᴜᴍʙᴇʀs  : {count}\n"
+            f"├─❏ ɴᴜᴍʙᴇʀs  : {len(nums)}\n"
             f"└─❏"
         )
         for target in [MAIN_CHANNEL, STOCK_NOTIFY_CHANNEL_ID]:
@@ -642,12 +644,11 @@ async def broadcast_stock_notification(app, groups: dict):
                 await app.bot.send_document(
                     chat_id=target,
                     document=InputFile(BytesIO(file_bytes), filename=filename),
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=markup,
+                    caption=caption, parse_mode=ParseMode.HTML, reply_markup=markup,
                 )
             except Exception as e:
                 logger.error(f"Channel notification error ({target}): {e}")
+        await asyncio.sleep(0.5)
         all_users = await db_fetchall("SELECT user_id FROM users WHERE is_banned=FALSE")
         for row in all_users:
             if row["user_id"] in ADMIN_IDS:
@@ -656,13 +657,12 @@ async def broadcast_stock_notification(app, groups: dict):
                 await app.bot.send_document(
                     chat_id=row["user_id"],
                     document=InputFile(BytesIO(file_bytes), filename=filename),
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
-                    reply_markup=markup,
+                    caption=caption, parse_mode=ParseMode.HTML, reply_markup=markup,
                 )
-                await asyncio.sleep(0.05)
+                await asyncio.sleep(0.04)
             except Exception:
                 pass
+        await asyncio.sleep(1)
 
 def format_otp_message(row, otp):
     masked             = mask_number(row["number"])
@@ -684,20 +684,14 @@ def solve_captcha(html):
     try:
         soup      = BeautifulSoup(html, "html.parser")
         full_text = soup.get_text(" ", strip=True)
-        m = re.search(
-            r"[Ww]hat\s+is\s+(\d+)\s*([\+\-*×xX÷/])\s*(\d+)\s*[=?]",
-            full_text,
-        )
+        m = re.search(r"[Ww]hat\s+is\s+(\d+)\s*([\+\-*×xX÷/])\s*(\d+)\s*[=?]", full_text)
         if not m:
             for tag in soup.find_all(True):
-                t = tag.get_text(strip=True)
-                m = re.search(r"(\d+)\s*([\+\-*×xX÷/])\s*(\d+)\s*=\s*\?", t)
+                m = re.search(r"(\d+)\s*([\+\-*×xX÷/])\s*(\d+)\s*=\s*\?", tag.get_text(strip=True))
                 if m:
                     break
         if m:
-            a  = int(m.group(1))
-            op = m.group(2).strip()
-            b  = int(m.group(3))
+            a, op, b = int(m.group(1)), m.group(2).strip(), int(m.group(3))
             if op == "+":                    return str(a + b)
             if op == "-":                    return str(a - b)
             if op in ("*", "×", "x", "X"): return str(a * b)
@@ -740,14 +734,24 @@ class PanelSession:
         if now < self._next_login_at:
             return False
         try:
-            sess       = await self._get_session()
-            login_html = ""
+            sess = await self._get_session()
             try:
-                async with sess.get(PANEL_LOGIN_PAGE, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                async with sess.get(
+                    PANEL_LOGIN_PAGE, allow_redirects=True,
+                    timeout=aiohttp.ClientTimeout(total=30),
+                ) as resp:
                     login_html = await resp.text(errors="replace")
+                    if "login" not in str(resp.url).lower() and resp.status == 200:
+                        self._logged_in      = True
+                        self._login_attempts = 0
+                        self._next_login_at  = 0
+                        self._last_activity  = time.time()
+                        await self._fetch_sesskey(sess)
+                        return True
             except Exception as e:
                 logger.error(f"Login page fetch error: {e}")
                 return False
+
             if not login_html:
                 return False
 
@@ -757,11 +761,14 @@ class PanelSession:
             if etkk_inp:
                 etkk = etkk_inp.get("value", "")
             if not etkk:
-                m = re.search(r'name=["\']etkk["\'][^>]*value=["\']([^"\']+)["\']', login_html)
-                if not m:
-                    m = re.search(r'value=["\']([^"\']+)["\'][^>]*name=["\']etkk["\']', login_html)
-                if m:
-                    etkk = m.group(1)
+                for pat in (
+                    r'name=["\']etkk["\'][^>]*value=["\']([^"\']+)["\']',
+                    r'value=["\']([^"\']+)["\'][^>]*name=["\']etkk["\']',
+                ):
+                    m = re.search(pat, login_html)
+                    if m:
+                        etkk = m.group(1)
+                        break
 
             capt      = solve_captcha(login_html)
             form_data = aiohttp.FormData()
@@ -769,14 +776,17 @@ class PanelSession:
                 form_data.add_field("etkk", etkk)
             form_data.add_field("username", PANEL_USERNAME)
             form_data.add_field("password", PANEL_PASSWORD)
-            form_data.add_field("capt", capt)
+            form_data.add_field("capt",     capt)
 
             async with sess.post(
                 PANEL_SIGNIN_URL, data=form_data,
                 headers={
-                    "Referer": PANEL_LOGIN_PAGE, "Origin": PANEL_BASE,
-                    "Sec-Fetch-Site": "same-origin", "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1", "Sec-Fetch-Dest": "document",
+                    "Referer":        PANEL_LOGIN_PAGE,
+                    "Origin":         PANEL_BASE,
+                    "Sec-Fetch-Site": "same-origin",
+                    "Sec-Fetch-Mode": "navigate",
+                    "Sec-Fetch-User": "?1",
+                    "Sec-Fetch-Dest": "document",
                 },
                 allow_redirects=False,
                 timeout=aiohttp.ClientTimeout(total=30),
@@ -790,9 +800,11 @@ class PanelSession:
                     else:
                         redirect_url = PANEL_BASE + "/"
                     try:
-                        async with sess.get(redirect_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as redir_resp:
-                            final = str(redir_resp.url)
-                            if "login" in final.lower():
+                        async with sess.get(
+                            redirect_url, allow_redirects=True,
+                            timeout=aiohttp.ClientTimeout(total=20),
+                        ) as redir_resp:
+                            if "login" in str(redir_resp.url).lower():
                                 return False
                     except Exception as e:
                         logger.warning(f"Post-login redirect warning: {e}")
@@ -805,20 +817,21 @@ class PanelSession:
                     return True
 
                 self._login_attempts += 1
-                backoff = min(30 * (2 ** (self._login_attempts - 1)), 1800)
-                self._next_login_at = time.time() + backoff
+                self._next_login_at   = time.time() + min(30 * (2 ** (self._login_attempts - 1)), 1800)
                 return False
 
         except Exception as e:
             logger.error(f"Login exception: {e}")
             self._login_attempts += 1
-            backoff = min(30 * (2 ** (self._login_attempts - 1)), 1800)
-            self._next_login_at = time.time() + backoff
+            self._next_login_at   = time.time() + min(30 * (2 ** (self._login_attempts - 1)), 1800)
             return False
 
     async def _fetch_sesskey(self, sess):
         try:
-            async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with sess.get(
+                PANEL_CDR_URL, allow_redirects=True,
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
                 if "login" in str(resp.url).lower():
                     return
                 html = await resp.text(errors="replace")
@@ -837,7 +850,10 @@ class PanelSession:
     async def keepalive(self):
         try:
             sess = await self._get_session()
-            async with sess.get(PANEL_DASHBOARD_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with sess.get(
+                PANEL_DASHBOARD_URL, allow_redirects=True,
+                timeout=aiohttp.ClientTimeout(total=20),
+            ) as resp:
                 if "login" in str(resp.url).lower():
                     self._logged_in = False
                     return False
@@ -849,15 +865,79 @@ class PanelSession:
 
     async def fetch_cdr(self):
         try:
-            sess   = await self._get_session()
-            params = {"draw": "1", "start": "0", "length": "50"}
+            sess = await self._get_session()
+            now  = datetime.now()
+            params = {
+                "fdate1":         now.strftime("%Y-%m-%d 00:00:00"),
+                "fdate2":         now.strftime("%Y-%m-%d 23:59:59"),
+                "frange":         "",
+                "fnum":           "",
+                "fcli":           "",
+                "fgdate":         "",
+                "fgmonth":        "",
+                "fgrange":        "",
+                "fgnumber":       "",
+                "fgcli":          "",
+                "fg":             "0",
+                "sEcho":          "1",
+                "iColumns":       "7",
+                "sColumns":       ".......",
+                "iDisplayStart":  "0",
+                "iDisplayLength": "25",
+                "mDataProp_0":    "0",
+                "sSearch_0":      "",
+                "bRegex_0":       "false",
+                "bSearchable_0":  "true",
+                "bSortable_0":    "true",
+                "mDataProp_1":    "1",
+                "sSearch_1":      "",
+                "bRegex_1":       "false",
+                "bSearchable_1":  "true",
+                "bSortable_1":    "true",
+                "mDataProp_2":    "2",
+                "sSearch_2":      "",
+                "bRegex_2":       "false",
+                "bSearchable_2":  "true",
+                "bSortable_2":    "true",
+                "mDataProp_3":    "3",
+                "sSearch_3":      "",
+                "bRegex_3":       "false",
+                "bSearchable_3":  "true",
+                "bSortable_3":    "true",
+                "mDataProp_4":    "4",
+                "sSearch_4":      "",
+                "bRegex_4":       "false",
+                "bSearchable_4":  "true",
+                "bSortable_4":    "true",
+                "mDataProp_5":    "5",
+                "sSearch_5":      "",
+                "bRegex_5":       "false",
+                "bSearchable_5":  "true",
+                "bSortable_5":    "true",
+                "mDataProp_6":    "6",
+                "sSearch_6":      "",
+                "bRegex_6":       "false",
+                "bSearchable_6":  "true",
+                "bSortable_6":    "true",
+                "sSearch":        "",
+                "bRegex":         "false",
+                "iSortCol_0":     "0",
+                "sSortDir_0":     "desc",
+                "iSortingCols":   "1",
+                "_":              str(int(time.time() * 1000)),
+            }
             if self._sesskey:
                 params["sesskey"] = self._sesskey
+
             async with sess.get(
                 PANEL_DATA_URL, params=params,
                 headers={
-                    "Referer": PANEL_CDR_URL, "X-Requested-With": "XMLHttpRequest",
-                    "Accept": "application/json, text/javascript, */*; q=0.01",
+                    "Referer":          PANEL_CDR_URL,
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept":           "application/json, text/javascript, */*; q=0.01",
+                    "Sec-Fetch-Dest":   "empty",
+                    "Sec-Fetch-Mode":   "cors",
+                    "Sec-Fetch-Site":   "same-origin",
                 },
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=30),
@@ -923,13 +1003,27 @@ async def sms_worker(app):
                 if not ok:
                     worker_info["errors"] += 1
                     if panel._login_attempts == 1:
-                        await notify_admins(app, f"┌─ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ\n├─❏ ᴘᴀɴᴇʟ : imssms.org\n├─❏ ᴀᴛᴛᴇᴍᴘᴛ : #{panel._login_attempts}\n└─❏ ʀᴇᴛʀʏɪɴɢ...")
+                        await notify_admins(
+                            app,
+                            f"┌─ ʟᴏɢɪɴ ғᴀɪʟᴇᴅ\n"
+                            f"├─❏ ᴘᴀɴᴇʟ : imssms.org\n"
+                            f"├─❏ ᴀᴛᴛᴇᴍᴘᴛ : #{panel._login_attempts}\n"
+                            f"└─❏ ʀᴇᴛʀʏɪɴɢ...",
+                        )
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
                 worker_info["logged_in"]  = True
                 worker_info["last_login"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 worker_info["errors"]     = 0
-                await notify_admins(app, f"┌─ ɪᴍs ʟᴏɢɪɴ\n├─❏ sᴛᴀᴛᴜs : ᴏɴʟɪɴᴇ\n├─❏ ᴘᴀɴᴇʟ : imssms.org\n├─❏ ᴜsᴇʀ : {PANEL_USERNAME}\n├─❏ ᴛɪᴍᴇ : {worker_info['last_login']}\n└─❏ {BOT_NAME} ɪs ʟɪᴠᴇ")
+                await notify_admins(
+                    app,
+                    f"┌─ ɪᴍs ʟᴏɢɪɴ\n"
+                    f"├─❏ sᴛᴀᴛᴜs : ᴏɴʟɪɴᴇ\n"
+                    f"├─❏ ᴘᴀɴᴇʟ : imssms.org\n"
+                    f"├─❏ ᴜsᴇʀ : {PANEL_USERNAME}\n"
+                    f"├─❏ ᴛɪᴍᴇ : {worker_info['last_login']}\n"
+                    f"└─❏ {BOT_NAME} ɪs ʟɪᴠᴇ",
+                )
                 startup_rows, _ = await panel.fetch_cdr()
                 if startup_rows:
                     for r in startup_rows:
@@ -1022,30 +1116,10 @@ async def sms_worker(app):
 
 BANNED_TEXT = "ʏᴏᴜ ʜᴀᴠᴇ ʙᴇᴇɴ ʙᴀɴɴᴇᴅ."
 MAINT_TEXT  = "ʙᴏᴛ ɪs ᴜɴᴅᴇʀ ᴍᴀɪɴᴛᴇɴᴀɴᴄᴇ. ᴄʜᴇᴄᴋ ʙᴀᴄᴋ sᴏᴏɴ."
-
-JOIN_TEXT = (
-    f"┌─ {BOT_NAME}\n"
-    f"├─❏ ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ\n"
-    f"└─❏ ᴛᴀᴘ ᴠᴇʀɪғʏ ᴡʜᴇɴ ᴅᴏɴᴇ"
-)
-
-WELCOME_TEXT = (
-    f"┌─ {BOT_NAME}\n"
-    f"├─❏ ʟɪᴠᴇ ᴏᴛᴘ ᴍᴏɴɪᴛᴏʀɪɴɢ 24/7\n"
-    f"└─❏"
-)
-
-WELCOME_ADMIN_TEXT = (
-    f"┌─ {BOT_NAME}\n"
-    f"├─❏ ᴡᴇʟᴄᴏᴍᴇ ʙᴀᴄᴋ, ᴀᴅᴍɪɴ\n"
-    f"└─❏"
-)
-
-GET_NUMBER_TEXT = (
-    f"┌─ ɢᴇᴛ ɴᴜᴍʙᴇʀ\n"
-    f"├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n"
-    f"└─❏"
-)
+JOIN_TEXT   = f"┌─ {BOT_NAME}\n├─❏ ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟs ᴛᴏ ᴄᴏɴᴛɪɴᴜᴇ\n└─❏ ᴛᴀᴘ ᴠᴇʀɪғʏ ᴡʜᴇɴ ᴅᴏɴᴇ"
+WELCOME_TEXT       = f"┌─ {BOT_NAME}\n├─❏ ʟɪᴠᴇ ᴏᴛᴘ ᴍᴏɴɪᴛᴏʀɪɴɢ 24/7\n└─❏"
+WELCOME_ADMIN_TEXT = f"┌─ {BOT_NAME}\n├─❏ ᴡᴇʟᴄᴏᴍᴇ ʙᴀᴄᴋ, ᴀᴅᴍɪɴ\n└─❏"
+GET_NUMBER_TEXT    = "┌─ ɢᴇᴛ ɴᴜᴍʙᴇʀ\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏"
 
 def number_display_text(number, country_name, flag, service):
     display = f"+{number}" if not str(number).startswith("+") else number
@@ -1068,66 +1142,30 @@ def number_changed_text(number, country_name, flag, service):
     )
 
 def admin_text():
-    return (
-        f"┌─ ᴀᴅᴍɪɴ\n"
-        f"├─❏ ᴍᴀɴᴀɢᴇ ᴛʜᴇ ɴᴜᴍʙᴇʀ ᴅᴀᴛᴀʙᴀsᴇ\n"
-        f"└─❏"
-    )
+    return "┌─ ᴀᴅᴍɪɴ\n├─❏ ᴍᴀɴᴀɢᴇ ᴛʜᴇ ɴᴜᴍʙᴇʀ ᴅᴀᴛᴀʙᴀsᴇ\n└─❏"
 
 async def numbers_db_text():
     total = await db_fetchval("SELECT COUNT(*) FROM numbers")
     avail = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=FALSE")
     used  = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=TRUE")
-    return (
-        f"┌─ ɴᴜᴍʙᴇʀs\n"
-        f"├─❏ ᴛᴏᴛᴀʟ  : {total}\n"
-        f"├─❏ ᴀᴠᴀɪʟ  : {avail}\n"
-        f"├─❏ ᴜsᴇᴅ   : {used}\n"
-        f"└─❏"
-    )
+    return f"┌─ ɴᴜᴍʙᴇʀs\n├─❏ ᴛᴏᴛᴀʟ : {total}\n├─❏ ᴀᴠᴀɪʟ : {avail}\n├─❏ ᴜsᴇᴅ  : {used}\n└─❏"
 
 async def status_text():
     total_users   = await db_fetchval("SELECT COUNT(*) FROM users WHERE is_banned=FALSE") or 0
     monthly_users = await get_monthly_users()
-    logged_status = "ᴏɴʟɪɴᴇ" if worker_info["logged_in"] else "ᴏғғʟɪɴᴇ"
-    worker_status = "ʀᴜɴɴɪɴɢ" if worker_info["running"] else "sᴛᴏᴘᴘᴇᴅ"
     return (
         f"┌─ sᴛᴀᴛᴜs\n"
-        f"├─❏ ɪᴍs      : {logged_status}\n"
-        f"├─❏ ᴡᴏʀᴋᴇʀ   : {worker_status}\n"
+        f"├─❏ ɪᴍs       : {'ᴏɴʟɪɴᴇ' if worker_info['logged_in'] else 'ᴏғғʟɪɴᴇ'}\n"
+        f"├─❏ ᴡᴏʀᴋᴇʀ    : {'ʀᴜɴɴɪɴɢ' if worker_info['running'] else 'sᴛᴏᴘᴘᴇᴅ'}\n"
         f"├─❏ ʟᴀsᴛ ʟᴏɢɪɴ : {worker_info['last_login']}\n"
         f"├─❏ ᴏᴛᴘs ᴛᴏᴅᴀʏ : {worker_info['otps_today']}\n"
         f"├─❏ ʟᴀsᴛ ᴏᴛᴘ   : {worker_info['last_otp']}\n"
-        f"├─❏ ᴇʀʀᴏʀs    : {worker_info['errors']}\n"
-        f"├─❏ ᴜsᴇʀs     : {total_users}\n"
-        f"├─❏ ᴍᴏɴᴛʜʟʏ   : {monthly_users}\n"
-        f"├─❏ sᴛᴀʀᴛᴇᴅ   : {worker_info['started_at']}\n"
+        f"├─❏ ᴇʀʀᴏʀs     : {worker_info['errors']}\n"
+        f"├─❏ ᴜsᴇʀs      : {total_users}\n"
+        f"├─❏ ᴍᴏɴᴛʜʟʏ    : {monthly_users}\n"
+        f"├─❏ sᴛᴀʀᴛᴇᴅ    : {worker_info['started_at']}\n"
         f"└─❏"
     )
-
-async def process_numbers_async(data: bytes, filename: str) -> dict:
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _process_numbers_sync, data, filename)
-
-def _process_numbers_sync(data: bytes, filename: str) -> dict:
-    nums  = load_numbers_file(data, filename)
-    seen  = set()
-    groups = {}
-    dupes  = 0
-    for raw in nums:
-        clean = re.sub(r"\D", "", raw)
-        if not (7 <= len(clean) <= 15):
-            continue
-        if clean in seen:
-            dupes += 1
-            continue
-        seen.add(clean)
-        _, cname, flag = parse_phone(clean)
-        key = cname or "Unknown"
-        if key not in groups:
-            groups[key] = {"flag": flag or "🌐", "numbers": []}
-        groups[key]["numbers"].append(clean)
-    return {"groups": groups, "dupes": dupes, "total": len(nums)}
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -1335,7 +1373,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if data == "adm_add_numbers":
         USER_STATE[user.id] = "ADM_PICK_SERVICE"
-        await edit_msg(query, "┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏", reply_markup=_service_picker_markup())
+        await edit_msg(query, "┌─ ᴀᴅᴅ ɴᴜᴍʙᴇʀs\n├─❏ sᴇʟᴇᴄᴛ sᴇʀᴠɪᴄᴇ\n└─❏", reply_markup=service_picker_markup())
         return
 
     if data == "adm_delete_numbers":
@@ -1416,7 +1454,6 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
     state = USER_STATE.get(user.id)
     if not state:
         return
-
     if state == "ADM_CUSTOM_SVC":
         service = text.strip()
         USER_STATE[user.id] = f"WAITING_FILE__{service}"
@@ -1428,7 +1465,7 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
 async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user  = update.effective_user
+    user = update.effective_user
     if not is_admin(user.id):
         return
     state = USER_STATE.get(user.id)
@@ -1440,67 +1477,81 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_msg(context.bot, update.effective_chat.id, "ɪɴᴠᴀʟɪᴅ ғɪʟᴇ. ᴜsᴇ .ᴛxᴛ, .ᴄsᴠ, .xʟs ᴏʀ .xʟsx")
         return
 
-    status_msg = await send_msg(context.bot, update.effective_chat.id, "⏳ ᴘʀᴏᴄᴇssɪɴɢ...")
+    status_msg = await send_msg(context.bot, update.effective_chat.id, "ᴘʀᴏᴄᴇssɪɴɢ...")
     try:
         tg_file = await doc.get_file()
         content = bytes(await tg_file.download_as_bytearray())
-
-        result = await process_numbers_async(content, doc.file_name)
-
-        groups = result["groups"]
-        dupes  = result["dupes"]
-        total  = result["total"]
+        result  = await process_numbers_async(content, doc.file_name)
+        groups  = result["groups"]
+        total   = result["total"]
 
         if not groups:
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
                 message_id=status_msg.message_id,
                 text="┌─ ᴇʀʀᴏʀ\n├─❏ ɴᴏ ᴠᴀʟɪᴅ ɴᴜᴍʙᴇʀs ғᴏᴜɴᴅ\n└─❏",
-                reply_markup=_markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="adm_numbers")]]),
+                reply_markup=mk([[btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
             USER_STATE.pop(user.id, None)
             return
 
-        count_added = 0
+        all_rows = []
+        for country, cdata in groups.items():
+            for n in cdata["numbers"]:
+                all_rows.append((country, cdata["flag"], n, service))
+
+        pool = await get_pool()
+        async with pool.acquire() as conn:
+            await conn.executemany(
+                "INSERT INTO numbers (country, flag, number, service) "
+                "VALUES ($1, $2, $3, $4) ON CONFLICT (number) DO NOTHING",
+                all_rows,
+            )
+
+        inserted_after = await db_fetchall(
+            "SELECT number, country, flag FROM numbers WHERE number = ANY($1::text[]) AND service=$2",
+            [r[2] for r in all_rows], service,
+        )
+        inserted_set  = {r["number"] for r in inserted_after}
+        all_input_set = {r[2] for r in all_rows}
+        new_nums      = inserted_set & all_input_set
+
+        count_added   = 0
         notify_groups = {}
         for country, cdata in groups.items():
-            flag = cdata["flag"]
-            for n in cdata["numbers"]:
-                res = await db_execute(
-                    "INSERT INTO numbers (country, flag, number, service) VALUES ($1,$2,$3,$4) ON CONFLICT (number) DO NOTHING",
-                    country, flag, n, service,
-                )
-                if res == "INSERT 0 1":
-                    count_added += 1
-                    if country not in notify_groups:
-                        notify_groups[country] = {"flag": flag, "service": service, "numbers": []}
-                    notify_groups[country]["numbers"].append(n)
+            flag       = cdata["flag"]
+            added_here = [n for n in cdata["numbers"] if n in new_nums]
+            if added_here:
+                count_added += len(added_here)
+                notify_groups[country] = {"flag": flag, "service": service, "numbers": added_here}
 
         USER_STATE.pop(user.id, None)
-
-        summary_lines = [
-            f"┌─ ᴅᴏɴᴇ",
+        lines = [
+            "┌─ ᴅᴏɴᴇ",
             f"├─❏ sᴇʀᴠɪᴄᴇ : {sc(service)}",
-            f"├─❏ ғɪʟᴇ   : {doc.file_name}",
-            f"├─❏ ᴛᴏᴛᴀʟ  : {total}",
-            f"├─❏ ᴀᴅᴅᴇᴅ  : {count_added}",
-            f"├─❏ ᴅᴜᴘᴇs  : {total - count_added}",
+            f"├─❏ ғɪʟᴇ    : {doc.file_name}",
+            f"├─❏ ᴛᴏᴛᴀʟ   : {total}",
+            f"├─❏ ᴀᴅᴅᴇᴅ   : {count_added}",
+            f"├─❏ ᴅᴜᴘᴇs   : {total - count_added}",
         ]
         for country, cdata in sorted(notify_groups.items(), key=lambda x: -len(x[1]["numbers"])):
-            summary_lines.append(f"├─❏ {cdata['flag']} {sc(country)} : {len(cdata['numbers'])}")
-        summary_lines.append("└─❏")
+            lines.append(f"├─❏ {cdata['flag']} {sc(country)} : {len(cdata['numbers'])}")
+        lines.append("└─❏")
 
         try:
             await context.bot.edit_message_text(
                 chat_id=update.effective_chat.id,
                 message_id=status_msg.message_id,
-                text="\n".join(summary_lines),
+                text="\n".join(lines),
                 parse_mode=ParseMode.HTML,
-                reply_markup=_markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="adm_numbers")]]),
+                reply_markup=mk([[btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
         except Exception:
-            await send_msg(context.bot, update.effective_chat.id, "\n".join(summary_lines),
-                           reply_markup=_markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="adm_numbers")]]))
+            await send_msg(
+                context.bot, update.effective_chat.id,
+                "\n".join(lines),
+                reply_markup=mk([[btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
+            )
 
         if notify_groups:
             asyncio.create_task(broadcast_stock_notification(context.application, notify_groups))
@@ -1512,7 +1563,7 @@ async def document_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 chat_id=update.effective_chat.id,
                 message_id=status_msg.message_id,
                 text="┌─ ᴇʀʀᴏʀ\n├─❏ ғᴀɪʟᴇᴅ ᴛᴏ ᴘʀᴏᴄᴇss ғɪʟᴇ\n└─❏",
-                reply_markup=_markup([[InlineKeyboardButton("🔴 ʙᴀᴄᴋ", callback_data="adm_numbers")]]),
+                reply_markup=mk([[btn("ʙᴀᴄᴋ", cb="adm_numbers", style="danger")]]),
             )
         except Exception:
             pass
@@ -1534,13 +1585,10 @@ async def health_handler(request):
 
 async def post_init(application):
     global maintenance
-
     await init_db()
-
     saved_maint = await get_setting("maintenance")
     if saved_maint == "1":
         maintenance = True
-
     extra = await get_setting("extra_admins")
     if extra:
         for eid in extra.split(","):
@@ -1549,52 +1597,36 @@ async def post_init(application):
                 aid = int(eid)
                 if aid not in ADMIN_IDS:
                     ADMIN_IDS.append(aid)
-
     try:
         await db_execute("ALTER TABLE numbers ADD COLUMN IF NOT EXISTS flag TEXT DEFAULT '🌐'")
     except Exception:
         pass
-
     recent = await db_fetchall("SELECT hash FROM otp_history ORDER BY id DESC LIMIT 30000")
     for r in recent:
         otp_cache.add(r["hash"])
     logger.info(f"Loaded {len(otp_cache)} OTP hashes into cache")
-
-    commands = [
+    await application.bot.set_my_commands([
         BotCommand("start",  "start"),
         BotCommand("admin",  "admin"),
         BotCommand("cancel", "cancel"),
-    ]
-    await application.bot.set_my_commands(commands)
-
+    ])
     app_web = web.Application()
     app_web.router.add_get("/",       health_handler)
     app_web.router.add_get("/health", health_handler)
     runner = web.AppRunner(app_web)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
+    await web.TCPSite(runner, "0.0.0.0", PORT).start()
     logger.info(f"Health server on port {PORT}")
-
     application.create_task(sms_worker(application))
     logger.info(f"{BOT_NAME} is live")
 
 if __name__ == "__main__":
-    application = (
-        ApplicationBuilder()
-        .token(BOT_TOKEN)
-        .post_init(post_init)
-        .build()
-    )
+    application = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
     application.add_handler(CommandHandler("start",  start))
     application.add_handler(CommandHandler("admin",  admin_cmd))
     application.add_handler(CommandHandler("cancel", cancel_cmd))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_input_handler))
-
     logger.info(f"Starting {BOT_NAME}...")
-    application.run_polling(
-        drop_pending_updates=True,
-        allowed_updates=Update.ALL_TYPES,
-    )
+    application.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
