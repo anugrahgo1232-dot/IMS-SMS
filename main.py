@@ -63,12 +63,12 @@ FORCE_CHANNELS      = ["@sage_xd", "@mr_afrix", "@oxellabs", "@oracron"]
 
 DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
-POLL_INTERVAL       = 8
-KEEPALIVE_INTERVAL  = 90
+POLL_INTERVAL       = 5
+KEEPALIVE_INTERVAL  = 180
 FLOOD_LIMIT         = 5
 FLOOD_WINDOW        = 10
 NUMBER_COOLDOWN     = 30
-LOGIN_MIN_INTERVAL  = 300
+LOGIN_MIN_INTERVAL  = 60
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -370,18 +370,6 @@ def main_menu_markup(user_id=None):
         [
             _btn("ɢᴇᴛ ɴᴜᴍʙᴇʀ",   cb="menu_get_number",  style="success"),
             _btn("ʟɪᴠᴇ ᴛʀᴀꜰꜰɪᴄ", cb="menu_live_traffic", style="danger"),
-        ],
-        [
-            _btn("ꜰʙ 2ꜰᴀ ᴋᴇʏ", cb="menu_fb2fa",  style="primary"),
-            _btn("ꜱᴛᴏᴄᴋ",      cb="menu_stock",  style="primary"),
-        ],
-        [
-            _btn("ʀᴇꜰᴇʀ & ᴇᴀʀɴ", cb="menu_refer",   style="primary"),
-            _btn("ʙᴀʟᴀɴᴄᴇ",      cb="menu_balance", style="primary"),
-        ],
-        [
-            _btn("ꜱᴜᴘᴘᴏʀᴛ",      cb="menu_support",     style="primary"),
-            _btn("ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ", cb="menu_leaderboard", style="primary"),
         ],
         [_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")],
     ]
@@ -788,19 +776,19 @@ class PanelSession:
         self._last_login_try = 0
         self._login_backoff  = LOGIN_MIN_INTERVAL
         self._last_activity  = 0
+        self._last_ping      = 0
 
     async def _get_session(self):
         if self._session is None or self._session.closed:
-            connector     = aiohttp.TCPConnector(ssl=True, limit=5, ttl_dns_cache=300, enable_cleanup_closed=True)
+            connector     = aiohttp.TCPConnector(ssl=False, limit=10, ttl_dns_cache=600, enable_cleanup_closed=True)
             self._session = aiohttp.ClientSession(
                 connector=connector,
                 headers={
-                    "User-Agent":                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
-                    "Accept-Language":           "en-CI,en-GB;q=0.9,en-US;q=0.8,en;q=0.7",
-                    "Accept":                    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
-                    "Accept-Encoding":           "gzip, deflate, br",
-                    "Upgrade-Insecure-Requests": "1",
-                    "Cache-Control":             "max-age=0",
+                    "User-Agent":      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36",
+                    "Accept-Language": "en-US,en;q=0.9",
+                    "Accept-Encoding": "gzip, deflate",
+                    "Connection":      "keep-alive",
+                    "Cache-Control":   "max-age=0",
                 },
                 timeout=aiohttp.ClientTimeout(total=60, connect=20),
                 cookie_jar=aiohttp.CookieJar(unsafe=True),
@@ -809,6 +797,32 @@ class PanelSession:
 
     def _can_attempt_login(self):
         return time.time() - self._last_login_try >= self._login_backoff
+
+    async def _keepalive_ping(self):
+        if not self._logged_in:
+            return
+        now = time.time()
+        if now - self._last_ping < 120:
+            return
+        try:
+            sess = await self._get_session()
+            async with sess.get(
+                PANEL_CDR_URL,
+                allow_redirects=True,
+                timeout=aiohttp.ClientTimeout(total=15),
+                headers={"Referer": f"{PANEL_BASE}/ints/client/SMSDashboard"},
+            ) as resp:
+                final = str(resp.url)
+                if "/ints/login" in final.lower():
+                    logger.warning("Keepalive: session died, marking for relogin")
+                    self._logged_in         = False
+                    worker_info["logged_in"] = False
+                else:
+                    self._last_ping     = now
+                    self._last_activity = now
+                    logger.debug("Keepalive ping OK")
+        except Exception as e:
+            logger.warning(f"Keepalive ping failed: {e}")
 
     async def login(self) -> bool:
         if not self._can_attempt_login():
@@ -886,8 +900,28 @@ class PanelSession:
                     worker_info["login_errors"] += 1
                     return False
 
-                if "login" in location.lower():
+                if "/ints/login" in location.lower() or location.lower().endswith("/login"):
                     logger.error(f"Login rejected by panel — redirected back to login")
+                    self._login_backoff = min(self._login_backoff * 2, 3600)
+                    worker_info["login_errors"] += 1
+                    return False
+
+            await asyncio.sleep(2)
+
+            dashboard_url = f"{PANEL_BASE}/ints/client/SMSDashboard"
+            async with sess.get(
+                dashboard_url,
+                allow_redirects=True,
+                headers={
+                    "Referer": PANEL_LOGIN_PAGE,
+                    "Accept":  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as dash_resp:
+                dash_final = str(dash_resp.url)
+                logger.info(f"Dashboard after login: status={dash_resp.status} url={dash_final}")
+                if "/ints/login" in dash_final.lower():
+                    logger.error("Dashboard redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -898,19 +932,16 @@ class PanelSession:
                 PANEL_CDR_URL,
                 allow_redirects=True,
                 headers={
-                    "Referer":        PANEL_LOGIN_PAGE,
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1",
-                    "Sec-Fetch-Dest": "document",
+                    "Referer": dashboard_url,
+                    "Accept":  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
                 },
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as cdr_resp:
                 cdr_final  = str(cdr_resp.url)
                 cdr_status = cdr_resp.status
                 logger.info(f"CDR after login: status={cdr_status} url={cdr_final}")
-                if "login" in cdr_final.lower():
-                    logger.error(f"CDR redirected to login — session not accepted")
+                if "/ints/login" in cdr_final.lower():
+                    logger.error("CDR redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -946,7 +977,7 @@ class PanelSession:
         try:
             sess = await self._get_session()
             async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
-                if "login" in str(resp.url).lower():
+                if "/ints/login" in str(resp.url).lower():
                     self._logged_in         = False
                     worker_info["logged_in"] = False
                     return
@@ -967,7 +998,7 @@ class PanelSession:
             sess = await self._get_session()
             async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 final = str(resp.url)
-                if "login" in final.lower():
+                if "/ints/login" in final.lower() or "/login" == final.split(PANEL_BASE)[-1].rstrip("/"):
                     self._logged_in         = False
                     worker_info["logged_in"] = False
                     return False
@@ -997,7 +1028,7 @@ class PanelSession:
                 "fg":             "0",
                 "sEcho":          "1",
                 "iColumns":       "7",
-                "sColumns":       ",,,,,,",
+                "sColumns":       "......",
                 "iDisplayStart":  "0",
                 "iDisplayLength": "25",
                 "mDataProp_0":    "0",
@@ -1049,18 +1080,16 @@ class PanelSession:
                 PANEL_DATA_URL,
                 params=params,
                 headers={
-                    "Referer":          PANEL_CDR_URL,
+                    "Referer":          f"{PANEL_BASE}/ints/client/SMSDashboard",
                     "X-Requested-With": "XMLHttpRequest",
                     "Accept":           "application/json, text/javascript, */*; q=0.01",
-                    "Sec-Fetch-Site":   "same-origin",
-                    "Sec-Fetch-Mode":   "cors",
-                    "Sec-Fetch-Dest":   "empty",
+                    "Connection":       "keep-alive",
                 },
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 final = str(resp.url)
-                if "login" in final.lower():
+                if "/ints/login" in final.lower():
                     self._logged_in         = False
                     worker_info["logged_in"] = False
                     return None, "session_expired"
@@ -1103,11 +1132,30 @@ class PanelSession:
 panel = PanelSession()
 
 
+async def _watch_membership(app, user_id):
+    await asyncio.sleep(60)
+    try:
+        statuses   = await check_membership_per_channel(app.bot, user_id)
+        all_joined = all(statuses.values())
+        if not all_joined:
+            try:
+                await app.bot.send_message(
+                    chat_id=user_id,
+                    text=JOIN_TEXT,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=join_gate_markup(statuses),
+                    disable_web_page_preview=True,
+                )
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 async def sms_worker(app):
     if worker_info["running"]:
         return
     worker_info["running"] = True
-    keepalive_counter      = 0
     last_reset_day         = datetime.now().day
 
     while True:
@@ -1144,14 +1192,10 @@ async def sms_worker(app):
                     logger.info(f"Startup cache: {len(startup_rows)} rows")
                 continue
 
-            keepalive_counter += 1
-            if keepalive_counter >= (KEEPALIVE_INTERVAL // POLL_INTERVAL):
-                keepalive_counter = 0
-                alive = await panel.verify_session()
-                if not alive:
-                    worker_info["logged_in"] = False
-                    await notify_admins(app, "┌─ ᴘᴀɴᴇʟ\n├─❏ ꜱᴇꜱꜱɪᴏɴ ᴇxᴘɪʀᴇᴅ\n└─❏ ʀᴇʟᴏɢɢɪɴɢ...")
-                    continue
+            await panel._keepalive_ping()
+
+            if not panel._logged_in:
+                continue
 
             rows, err = await panel.fetch_cdr()
 
@@ -1258,6 +1302,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     welcome = ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
     await send_msg(context.bot, update.effective_chat.id, welcome, reply_markup=main_menu_markup(user.id))
+    asyncio.create_task(_watch_membership(context.application, user.id))
 
 async def cancel_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     USER_STATE.pop(update.effective_user.id, None)
@@ -1280,6 +1325,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await register_user(user)
             welcome = ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
             await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
+            asyncio.create_task(_watch_membership(context.application, user.id))
         else:
             await edit_msg(query, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
             await query.answer("ᴊᴏɪɴ ᴀʟʟ ᴄʜᴀɴɴᴇʟꜱ ꜰɪʀꜱᴛ.", show_alert=True)
@@ -1299,6 +1345,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_msg(query, welcome, reply_markup=main_menu_markup(user.id))
         return
 
+
     if data == "menu_admin":
         if not is_admin(user.id):
             await query.answer("ᴀᴅᴍɪɴꜱ ᴏɴʟʏ.", show_alert=True)
@@ -1317,11 +1364,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_msg(query, text, reply_markup=back_to_menu())
         return
 
-    if data == "menu_fb2fa":
-        text = f"┌─ ꜰʙ 2ꜰᴀ ᴋᴇʏ\n├─❏ ᴊᴏɪɴ ᴛʜᴇ ᴏᴛᴘ ɢʀᴏᴜᴘ ꜰᴏʀ ꜰᴀᴄᴇʙᴏᴏᴋ 2ꜰᴀ ᴋᴇʏꜱ\n└─❏"
-        markup = _markup([[_btn("ᴏᴛᴘ ɢʀᴏᴜᴘ", url=OTP_GROUP_LINK, style="primary")], [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
-        await edit_msg(query, text, reply_markup=markup)
-        return
 
     if data == "menu_stock":
         rows = await db_fetchall("SELECT service, COUNT(*) AS cnt FROM numbers WHERE is_used=FALSE GROUP BY service ORDER BY cnt DESC")
@@ -1332,39 +1374,9 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_msg(query, f"┌─ ꜱᴛᴏᴄᴋ\n{lines}\n└─❏", reply_markup=back_to_menu())
         return
 
-    if data == "menu_refer":
-        text = f"┌─ ʀᴇꜰᴇʀ & ᴇᴀʀɴ\n├─❏ ꜱʜᴀʀᴇ {BOT_LINK}\n├─❏ ɪɴᴠɪᴛᴇ ꜰʀɪᴇɴᴅꜱ ᴛᴏ ᴛʜᴇ ʙᴏᴛ\n└─❏"
-        markup = _markup([[_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")]])
-        await edit_msg(query, text, reply_markup=markup)
-        return
 
-    if data == "menu_balance":
-        total_otps = await db_fetchval("SELECT COUNT(*) FROM otp_history") or 0
-        text = (
-            f"┌─ ʙᴀʟᴀɴᴄᴇ\n"
-            f"├─❏ ᴏᴛᴘꜱ ᴄᴀᴜɢʜᴛ ᴛᴏᴅᴀʏ : {worker_info['otps_today']}\n"
-            f"├─❏ ᴛᴏᴛᴀʟ ᴏᴛᴘꜱ        : {total_otps}\n"
-            f"└─❏"
-        )
-        await edit_msg(query, text, reply_markup=back_to_menu())
-        return
 
-    if data == "menu_support":
-        text   = f"┌─ ꜱᴜᴘᴘᴏʀᴛ\n├─❏ ᴊᴏɪɴ ᴏᴜʀ ᴄʜᴀɴɴᴇʟ ꜰᴏʀ ʜᴇʟᴘ\n└─❏"
-        markup = _markup([
-            [_btn("ᴄʜᴀɴɴᴇʟ", url=MAIN_CHANNEL_LINK, style="primary")],
-            [_btn("ʙᴀᴄᴋ", cb="menu_back", style="danger")],
-        ])
-        await edit_msg(query, text, reply_markup=markup)
-        return
 
-    if data == "menu_leaderboard":
-        rows = await db_fetchall(
-            "SELECT number, COUNT(*) AS cnt FROM otp_history GROUP BY number ORDER BY cnt DESC LIMIT 5"
-        )
-        if not rows:
-            await edit_msg(query, "┌─ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n├─❏ ɴᴏ ᴅᴀᴛᴀ ʏᴇᴛ\n└─❏", reply_markup=back_to_menu())
-            return
         lines = "\n".join(f"├─❏ {mask_number(r['number'])} : {r['cnt']} ᴏᴛᴘꜱ" for r in rows)
         await edit_msg(query, f"┌─ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n{lines}\n└─❏", reply_markup=back_to_menu())
         return
