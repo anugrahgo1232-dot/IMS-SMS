@@ -25,6 +25,7 @@ from telegram import (
     InlineKeyboardButton,
     CopyTextButton,
     InputFile,
+    ReplyKeyboardRemove,
 )
 from telegram.constants import ParseMode
 from telegram.ext import (
@@ -46,8 +47,8 @@ PANEL_LOGIN_PAGE    = f"{PANEL_BASE}/ints/login"
 PANEL_SIGNIN_URL    = f"{PANEL_BASE}/ints/signin"
 PANEL_CDR_URL       = f"{PANEL_BASE}/ints/client/SMSCDRStats"
 PANEL_DATA_URL      = f"{PANEL_BASE}/ints/client/res/data_smscdr.php"
-PANEL_USERNAME      = "Belarus"
-PANEL_PASSWORD      = "Belarus"
+PANEL_USERNAME      = "WhatsappChannel"
+PANEL_PASSWORD      = "WhatsappChannel"
 
 MAIN_CHANNEL        = "@sage_xd"
 MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
@@ -810,7 +811,11 @@ class PanelSession:
                 PANEL_CDR_URL,
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=15),
-                headers={"Referer": f"{PANEL_BASE}/ints/client/SMSDashboard"},
+                headers={
+                    "Referer":                  f"{PANEL_BASE}/ints/client/SMSDashboard",
+                    "Accept":                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "Upgrade-Insecure-Requests": "1",
+                },
             ) as resp:
                 final = str(resp.url)
                 if "/ints/login" in final.lower():
@@ -820,7 +825,6 @@ class PanelSession:
                 else:
                     self._last_ping     = now
                     self._last_activity = now
-                    logger.debug("Keepalive ping OK")
         except Exception as e:
             logger.warning(f"Keepalive ping failed: {e}")
 
@@ -846,82 +850,36 @@ class PanelSession:
                     return False
                 login_html = await resp.text(errors="replace")
 
-            if not login_html:
-                self._login_backoff = min(self._login_backoff * 2, 3600)
-                worker_info["login_errors"] += 1
-                return False
-
-            soup     = BeautifulSoup(login_html, "html.parser")
-            etkk     = ""
-            etkk_inp = soup.find("input", {"name": "etkk"})
-            if etkk_inp:
-                etkk = etkk_inp.get("value", "")
-            if not etkk:
-                for pat in (
-                    r'name=["\']etkk["\'][^>]*value=["\']([^"\']+)["\']',
-                    r'value=["\']([^"\']+)["\'][^>]*name=["\']etkk["\']',
-                ):
-                    m = re.search(pat, login_html)
-                    if m:
-                        etkk = m.group(1)
-                        break
-
             capt = solve_captcha(login_html)
-            logger.info(f"Login: etkk={'yes' if etkk else 'no'}, capt={capt}")
+            logger.info(f"Login: capt={capt}")
 
-            form_data = aiohttp.FormData()
-            if etkk:
-                form_data.add_field("etkk", etkk)
-            form_data.add_field("username", PANEL_USERNAME)
-            form_data.add_field("password", PANEL_PASSWORD)
-            form_data.add_field("capt", capt)
+            payload = {
+                "username": PANEL_USERNAME,
+                "password": PANEL_PASSWORD,
+                "capt":     capt,
+            }
 
             async with sess.post(
                 PANEL_SIGNIN_URL,
-                data=form_data,
+                data=payload,
                 headers={
-                    "Referer":        PANEL_LOGIN_PAGE,
-                    "Origin":         PANEL_BASE,
-                    "Content-Type":   "application/x-www-form-urlencoded",
-                    "Sec-Fetch-Site": "same-origin",
-                    "Sec-Fetch-Mode": "navigate",
-                    "Sec-Fetch-User": "?1",
-                    "Sec-Fetch-Dest": "document",
+                    "Referer":                  PANEL_LOGIN_PAGE,
+                    "Origin":                   PANEL_BASE,
+                    "Content-Type":             "application/x-www-form-urlencoded",
+                    "Upgrade-Insecure-Requests": "1",
                 },
                 allow_redirects=False,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 location = resp.headers.get("Location", "")
                 logger.info(f"Signin: status={resp.status} location={location}")
-
                 if resp.status not in (301, 302):
-                    logger.error(f"Login not redirected: status={resp.status}")
+                    logger.error(f"Login not redirected: {resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
-
-                if "/ints/login" in location.lower() or location.lower().endswith("/login"):
-                    logger.error(f"Login rejected by panel — redirected back to login")
-                    self._login_backoff = min(self._login_backoff * 2, 3600)
-                    worker_info["login_errors"] += 1
-                    return False
-
-            await asyncio.sleep(2)
-
-            dashboard_url = f"{PANEL_BASE}/ints/client/SMSDashboard"
-            async with sess.get(
-                dashboard_url,
-                allow_redirects=True,
-                headers={
-                    "Referer": PANEL_LOGIN_PAGE,
-                    "Accept":  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                },
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as dash_resp:
-                dash_final = str(dash_resp.url)
-                logger.info(f"Dashboard after login: status={dash_resp.status} url={dash_final}")
-                if "/ints/login" in dash_final.lower():
-                    logger.error("Dashboard redirected to login — session not accepted")
+                if "/ints/login" in location.lower():
+                    logger.error("Login rejected — redirected back to login")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -932,14 +890,14 @@ class PanelSession:
                 PANEL_CDR_URL,
                 allow_redirects=True,
                 headers={
-                    "Referer": dashboard_url,
-                    "Accept":  "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Referer":                  f"{PANEL_BASE}/ints/client/SMSDashboard",
+                    "Accept":                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "Upgrade-Insecure-Requests": "1",
                 },
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as cdr_resp:
-                cdr_final  = str(cdr_resp.url)
-                cdr_status = cdr_resp.status
-                logger.info(f"CDR after login: status={cdr_status} url={cdr_final}")
+                cdr_final = str(cdr_resp.url)
+                logger.info(f"CDR after login: status={cdr_resp.status} url={cdr_final}")
                 if "/ints/login" in cdr_final.lower():
                     logger.error("CDR redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
@@ -950,12 +908,12 @@ class PanelSession:
             self._logged_in     = True
             self._login_backoff = LOGIN_MIN_INTERVAL
             self._last_activity = time.time()
+            self._last_ping     = time.time()
             worker_info["login_errors"] = 0
             worker_info["last_login"]   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             worker_info["logged_in"]    = True
-
             await self._extract_sesskey(cdr_html)
-            logger.info(f"Panel login OK — sesskey={'yes' if self._sesskey else 'no'}")
+            logger.info("Panel login OK")
             return True
 
         except Exception as e:
@@ -1301,6 +1259,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await send_msg(context.bot, update.effective_chat.id, JOIN_TEXT, reply_markup=join_gate_markup(statuses))
         return
     welcome = ADMIN_TEXT if is_admin(user.id) else WELCOME_TEXT
+    await context.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=".",
+        reply_markup=ReplyKeyboardRemove(),
+    )
     await send_msg(context.bot, update.effective_chat.id, welcome, reply_markup=main_menu_markup(user.id))
     asyncio.create_task(_watch_membership(context.application, user.id))
 
