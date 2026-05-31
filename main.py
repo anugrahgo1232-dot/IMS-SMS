@@ -66,6 +66,14 @@ PANEL3_DATA_URL     = f"{PANEL3_BASE}/konekta/client/res/data_smscdr.php"
 PANEL3_USERNAME     = "Malik0"
 PANEL3_PASSWORD     = "Malik0"
 
+PANEL4_BASE         = "http://151.80.19.204"
+PANEL4_LOGIN_PAGE   = f"{PANEL4_BASE}/ints/login"
+PANEL4_SIGNIN_URL   = f"{PANEL4_BASE}/ints/signin"
+PANEL4_CDR_URL      = f"{PANEL4_BASE}/ints/client/SMSCDRStats"
+PANEL4_DATA_URL     = f"{PANEL4_BASE}/ints/client/res/data_smscdr.php"
+PANEL4_USERNAME     = "Malik0"
+PANEL4_PASSWORD     = "Malik0"
+
 MAIN_CHANNEL        = "@sage_xd"
 MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
 BACKUP_CHANNEL      = "@mr_afrix"
@@ -110,15 +118,18 @@ worker_info = {
     "logged_in":       False,
     "logged_in_p2":    False,
     "logged_in_p3":    False,
+    "logged_in_p4":    False,
     "last_otp":        "—",
     "otps_today":      0,
     "last_login":      "—",
     "last_login_p2":   "—",
     "last_login_p3":   "—",
+    "last_login_p4":   "—",
     "errors":          0,
     "login_errors":    0,
     "login_errors_p2": 0,
     "login_errors_p3": 0,
+    "login_errors_p4": 0,
     "started_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
@@ -760,8 +771,10 @@ async def status_text():
     p1_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in"]    else "ᴏꜰꜰʟɪɴᴇ"
     p2_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p2"] else "ᴏꜰꜰʟɪɴᴇ"
     p3_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p3"] else "ᴏꜰꜰʟɪɴᴇ"
+    p4_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p4"] else "ᴏꜰꜰʟɪɴᴇ"
     return (
         f"┌─ ꜱᴛᴀᴛᴜꜱ\n"
+        f"├─❏ ᴢʏʀᴏɴ        : {p4_stat} | {worker_info['last_login_p4']}\n"
         f"├─❏ ꜱᴍꜱ ʜᴀᴅɪ    : {p1_stat} | {worker_info['last_login']}\n"
         f"├─❏ ɴɪɢᴇʀɪᴀ      : {p2_stat} | {worker_info['last_login_p2']}\n"
         f"├─❏ ᴋᴏɴᴇᴋᴛᴀ      : {p3_stat} | {worker_info['last_login_p3']}\n"
@@ -796,7 +809,8 @@ def solve_captcha(html):
 
 
 class PanelSession:
-    def __init__(self, base, login_page, signin_url, cdr_url, data_url, username, password, name="panel"):
+    def __init__(self, base, login_page, signin_url, cdr_url, data_url, username, password, name="panel",
+                 wi_logged="logged_in", wi_login="login_errors", wi_last_login="last_login"):
         self._base           = base
         self._login_page     = login_page
         self._signin_url     = signin_url
@@ -812,6 +826,9 @@ class PanelSession:
         self._login_backoff  = LOGIN_MIN_INTERVAL
         self._last_activity  = 0
         self._last_ping      = 0
+        self._wi_logged      = wi_logged
+        self._wi_login       = wi_login
+        self._wi_last_login  = wi_last_login
 
     async def _get_session(self):
         if self._session is None or self._session.closed:
@@ -855,12 +872,13 @@ class PanelSession:
                 login_path = self._login_page.split(self._base)[-1].lower()
                 if login_path in final.lower() or "/sign-in" in final.lower():
                     logger.warning(f"[{self._name}] Keepalive: session died, marking for relogin")
-                    self._logged_in         = False
+                    self._logged_in              = False
+                    worker_info[self._wi_logged] = False
                 else:
                     self._last_ping     = now
                     self._last_activity = now
         except Exception as e:
-            logger.warning(f"Keepalive ping failed: {e}")
+            logger.warning(f"[{self._name}] Keepalive ping failed: {e}")
 
     async def login(self) -> bool:
         if not self._can_attempt_login():
@@ -880,7 +898,7 @@ class PanelSession:
                 if resp.status != 200:
                     logger.error(f"[{self._name}] Login page status: {resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
-                    worker_info["login_errors"] += 1
+                    worker_info[self._wi_login] = worker_info.get(self._wi_login, 0) + 1
                     return False
                 login_html = await resp.text(errors="replace")
 
@@ -908,14 +926,14 @@ class PanelSession:
                 location = resp.headers.get("Location", "")
                 logger.info(f"[{self._name}] Signin: status={resp.status} location={location}")
                 if resp.status not in (301, 302):
-                    logger.error(f"Login not redirected: {resp.status}")
+                    logger.error(f"[{self._name}] Login not redirected: {resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
-                    worker_info["login_errors"] += 1
+                    worker_info[self._wi_login] = worker_info.get(self._wi_login, 0) + 1
                     return False
                 if self._login_page.split(self._base)[-1].lower() in location.lower() or "/sign-in" in location.lower():
                     logger.error(f"[{self._name}] Login rejected — redirected back to login")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
-                    worker_info["login_errors"] += 1
+                    worker_info[self._wi_login] = worker_info.get(self._wi_login, 0) + 1
                     return False
 
             await asyncio.sleep(1)
@@ -936,7 +954,7 @@ class PanelSession:
                 if login_path in cdr_final.lower() or "/sign-in" in cdr_final.lower():
                     logger.error(f"[{self._name}] CDR redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
-                    worker_info["login_errors"] += 1
+                    worker_info[self._wi_login] = worker_info.get(self._wi_login, 0) + 1
                     return False
                 cdr_html = await cdr_resp.text(errors="replace")
 
@@ -944,9 +962,9 @@ class PanelSession:
             self._login_backoff = LOGIN_MIN_INTERVAL
             self._last_activity = time.time()
             self._last_ping     = time.time()
-            worker_info["login_errors"] = 0
-            worker_info["last_login"]   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            worker_info["logged_in"]    = True
+            worker_info[self._wi_login]      = 0
+            worker_info[self._wi_last_login] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            worker_info[self._wi_logged]     = True
             await self._extract_sesskey(cdr_html)
             logger.info(f"[{self._name}] Panel login OK")
             return True
@@ -954,7 +972,7 @@ class PanelSession:
         except Exception as e:
             logger.error(f"[{self._name}] Login exception: {type(e).__name__}: {e}")
             self._login_backoff = min(self._login_backoff * 2, 3600)
-            worker_info["login_errors"] += 1
+            worker_info[self._wi_login] = worker_info.get(self._wi_login, 0) + 1
             return False
 
     async def _extract_sesskey(self, html: str):
@@ -972,7 +990,7 @@ class PanelSession:
             async with sess.get(self._cdr_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 if "/ints/login" in str(resp.url).lower():
                     self._logged_in         = False
-                    worker_info["logged_in"] = False
+                    worker_info[self._wi_logged] = False
                     return
                 h = await resp.text(errors="replace")
                 for pat in (
@@ -994,7 +1012,7 @@ class PanelSession:
                 login_path = self._login_page.split(self._base)[-1].lower()
                 if login_path in final.lower() or "/sign-in" in final.lower():
                     self._logged_in         = False
-                    worker_info["logged_in"] = False
+                    worker_info[self._wi_logged] = False
                     return False
                 self._last_activity = time.time()
                 return True
@@ -1086,7 +1104,7 @@ class PanelSession:
                 login_path = self._login_page.split(self._base)[-1].lower()
                 if login_path in final.lower() or "/sign-in" in final.lower():
                     self._logged_in         = False
-                    worker_info["logged_in"] = False
+                    worker_info[self._wi_logged] = False
                     return None, "session_expired"
                 text = await resp.text(errors="replace")
                 if not text.strip():
@@ -1096,7 +1114,7 @@ class PanelSession:
                 except Exception:
                     if ("login" in text.lower() or "sign-in" in text.lower()) and len(text) < 5000:
                         self._logged_in         = False
-                        worker_info["logged_in"] = False
+                        worker_info[self._wi_logged] = False
                         return None, "session_expired"
                     return None, "parse_error"
 
@@ -1127,19 +1145,28 @@ class PanelSession:
 panel  = PanelSession(
     base=PANEL_BASE, login_page=PANEL_LOGIN_PAGE, signin_url=PANEL_SIGNIN_URL,
     cdr_url=PANEL_CDR_URL, data_url=PANEL_DATA_URL,
-    username=PANEL_USERNAME, password=PANEL_PASSWORD, name="sms hadi"
+    username=PANEL_USERNAME, password=PANEL_PASSWORD, name="sms hadi",
+    wi_logged="logged_in", wi_login="login_errors", wi_last_login="last_login",
 )
 panel2 = PanelSession(
     base=PANEL2_BASE, login_page=PANEL2_LOGIN_PAGE, signin_url=PANEL2_SIGNIN_URL,
     cdr_url=PANEL2_CDR_URL, data_url=PANEL2_DATA_URL,
-    username=PANEL2_USERNAME, password=PANEL2_PASSWORD, name="nigeria"
+    username=PANEL2_USERNAME, password=PANEL2_PASSWORD, name="nigeria",
+    wi_logged="logged_in_p2", wi_login="login_errors_p2", wi_last_login="last_login_p2",
 )
 panel3 = PanelSession(
     base=PANEL3_BASE, login_page=PANEL3_LOGIN_PAGE, signin_url=PANEL3_SIGNIN_URL,
     cdr_url=PANEL3_CDR_URL, data_url=PANEL3_DATA_URL,
-    username=PANEL3_USERNAME, password=PANEL3_PASSWORD, name="konekta"
+    username=PANEL3_USERNAME, password=PANEL3_PASSWORD, name="konekta",
+    wi_logged="logged_in_p3", wi_login="login_errors_p3", wi_last_login="last_login_p3",
 )
-PANELS = [panel, panel2, panel3]
+panel4 = PanelSession(
+    base=PANEL4_BASE, login_page=PANEL4_LOGIN_PAGE, signin_url=PANEL4_SIGNIN_URL,
+    cdr_url=PANEL4_CDR_URL, data_url=PANEL4_DATA_URL,
+    username=PANEL4_USERNAME, password=PANEL4_PASSWORD, name="zyron",
+    wi_logged="logged_in_p4", wi_login="login_errors_p4", wi_last_login="last_login_p4",
+)
+PANELS = [panel4, panel, panel2, panel3]
 
 
 async def _watch_membership(app, user_id):
@@ -1187,7 +1214,6 @@ async def _panel_worker(app, p, wi_logged, wi_login, wi_last_login):
 
                 worker_info[wi_logged]     = True
                 worker_info[wi_last_login] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                worker_info["logged_in"]   = True
                 await notify_admins(app, f"┌─ [{p._name}]\n├─❏ ʟᴏɢɪɴ ᴏᴋ\n└─❏ ʟɪᴠᴇ")
 
                 startup_rows, _ = await p.fetch_cdr()
@@ -1241,7 +1267,7 @@ async def _panel_worker(app, p, wi_logged, wi_login, wi_last_login):
                             otp_cache.add(h)
                             continue
                         logger.info(f"[{p._name}] New OTP: {mask_number(number)} | {otp} — sending")
-                        text_msg, markup = format_otp_message(row, otp, panel_name=p._name)
+                        text_msg, markup = format_otp_message(row, otp)
                         await app.bot.send_message(
                             chat_id=OTP_GROUP_ID,
                             text=text_msg,
@@ -1291,6 +1317,7 @@ async def sms_worker(app):
         _panel_worker(app, panel,  "logged_in",    "login_errors",    "last_login"),
         _panel_worker(app, panel2, "logged_in_p2", "login_errors_p2", "last_login_p2"),
         _panel_worker(app, panel3, "logged_in_p3", "login_errors_p3", "last_login_p3"),
+        _panel_worker(app, panel4, "logged_in_p4", "login_errors_p4", "last_login_p4"),
     )
     worker_info["running"] = False
 
@@ -1398,12 +1425,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_msg(query, f"┌─ ꜱᴛᴏᴄᴋ\n{lines}\n└─❏", reply_markup=back_to_menu())
         return
 
-
-
-
-        lines = "\n".join(f"├─❏ {mask_number(r['number'])} : {r['cnt']} ᴏᴛᴘꜱ" for r in rows)
-        await edit_msg(query, f"┌─ ʟᴇᴀᴅᴇʀʙᴏᴀʀᴅ\n{lines}\n└─❏", reply_markup=back_to_menu())
-        return
 
     if data == "menu_get_number":
         statuses   = await check_membership_per_channel(context.bot, user.id)
