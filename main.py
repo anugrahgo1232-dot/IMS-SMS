@@ -50,6 +50,22 @@ PANEL_DATA_URL      = f"{PANEL_BASE}/ints/client/res/data_smscdr.php"
 PANEL_USERNAME      = "WhatsappChannel"
 PANEL_PASSWORD      = "WhatsappChannel"
 
+PANEL2_BASE         = "http://2.59.169.96"
+PANEL2_LOGIN_PAGE   = f"{PANEL2_BASE}/ints/login"
+PANEL2_SIGNIN_URL   = f"{PANEL2_BASE}/ints/signin"
+PANEL2_CDR_URL      = f"{PANEL2_BASE}/ints/client/SMSCDRStats"
+PANEL2_DATA_URL     = f"{PANEL2_BASE}/ints/client/res/data_smscdr.php"
+PANEL2_USERNAME     = "NigeriaTg019"
+PANEL2_PASSWORD     = "NigeriaTg019"
+
+PANEL3_BASE         = "http://15.235.182.3"
+PANEL3_LOGIN_PAGE   = f"{PANEL3_BASE}/konekta/sign-in"
+PANEL3_SIGNIN_URL   = f"{PANEL3_BASE}/konekta/signin"
+PANEL3_CDR_URL      = f"{PANEL3_BASE}/konekta/client/SMSCDRStats"
+PANEL3_DATA_URL     = f"{PANEL3_BASE}/konekta/client/res/data_smscdr.php"
+PANEL3_USERNAME     = "Malik0"
+PANEL3_PASSWORD     = "Malik0"
+
 MAIN_CHANNEL        = "@sage_xd"
 MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
 BACKUP_CHANNEL      = "@mr_afrix"
@@ -77,9 +93,11 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 logging.getLogger("telegram.ext").setLevel(logging.WARNING)
+logging.getLogger("aiohttp.client").setLevel(logging.WARNING)
 
 USER_STATE   = {}
 flood_data   = {}
@@ -88,14 +106,20 @@ maintenance  = False
 ADMIN_IDS    = list(BASE_ADMIN_IDS)
 
 worker_info = {
-    "running":      False,
-    "logged_in":    False,
-    "last_otp":     "—",
-    "otps_today":   0,
-    "last_login":   "—",
-    "errors":       0,
-    "login_errors": 0,
-    "started_at":   datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    "running":         False,
+    "logged_in":       False,
+    "logged_in_p2":    False,
+    "logged_in_p3":    False,
+    "last_otp":        "—",
+    "otps_today":      0,
+    "last_login":      "—",
+    "last_login_p2":   "—",
+    "last_login_p3":   "—",
+    "errors":          0,
+    "login_errors":    0,
+    "login_errors_p2": 0,
+    "login_errors_p3": 0,
+    "started_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
 _SC = str.maketrans(
@@ -682,7 +706,7 @@ async def broadcast_stock(app, country, flag, service, count, numbers_list):
         except Exception:
             pass
 
-def format_otp_message(row, otp):
+def format_otp_message(row, otp, panel_name=""):
     masked           = mask_number(row["number"])
     clean            = re.sub(r"\D", "", str(row["number"]))
     _, iso, cname, _ = parse_phone(clean)
@@ -693,6 +717,7 @@ def format_otp_message(row, otp):
     abbrev           = service_abbrev(raw_service)
 
     header = f"{flag} #{iso or 'XX'} #{abbrev} {masked}" if flag else f"#{iso or 'XX'} #{abbrev} {masked}"
+    src    = f"\n└─❏ ꜱʀᴄ      : {sc(panel_name)}" if panel_name else "\n└─❏"
 
     text = (
         f"<b>{header}</b>\n"
@@ -700,8 +725,7 @@ def format_otp_message(row, otp):
         f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{masked}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
         f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : #{abbrev}\n"
-        f"├─❏ ᴏᴛᴘ      : <code>{otp}</code>\n"
-        f"└─❏"
+        f"├─❏ ᴏᴛᴘ      : <code>{otp}</code>{src}"
     )
     return text, otp_markup(otp, sms_txt)
 
@@ -729,21 +753,23 @@ def admin_text():
     return f"┌─ ᴀᴅᴍɪɴ ᴘᴀɴᴇʟ\n├─❏ ᴍᴀɴᴀɢᴇ ɴᴜᴍʙᴇʀ ᴅᴀᴛᴀʙᴀꜱᴇ\n└─❏"
 
 async def status_text():
-    total  = await db_fetchval("SELECT COUNT(*) FROM numbers") or 0
-    avail  = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=FALSE") or 0
-    users  = await db_fetchval("SELECT COUNT(*) FROM users") or 0
-    otps   = await db_fetchval("SELECT COUNT(*) FROM otp_history") or 0
-    online = "ᴏɴʟɪɴᴇ" if worker_info["logged_in"] else "ᴏꜰꜰʟɪɴᴇ"
+    total   = await db_fetchval("SELECT COUNT(*) FROM numbers") or 0
+    avail   = await db_fetchval("SELECT COUNT(*) FROM numbers WHERE is_used=FALSE") or 0
+    users   = await db_fetchval("SELECT COUNT(*) FROM users") or 0
+    otps    = await db_fetchval("SELECT COUNT(*) FROM otp_history") or 0
+    p1_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in"]    else "ᴏꜰꜰʟɪɴᴇ"
+    p2_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p2"] else "ᴏꜰꜰʟɪɴᴇ"
+    p3_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p3"] else "ᴏꜰꜰʟɪɴᴇ"
     return (
         f"┌─ ꜱᴛᴀᴛᴜꜱ\n"
-        f"├─❏ ᴡᴏʀᴋᴇʀ      : {online}\n"
-        f"├─❏ ʟᴀꜱᴛ ʟᴏɢɪɴ  : {worker_info['last_login']}\n"
+        f"├─❏ ꜱᴍꜱ ʜᴀᴅɪ    : {p1_stat} | {worker_info['last_login']}\n"
+        f"├─❏ ɴɪɢᴇʀɪᴀ      : {p2_stat} | {worker_info['last_login_p2']}\n"
+        f"├─❏ ᴋᴏɴᴇᴋᴛᴀ      : {p3_stat} | {worker_info['last_login_p3']}\n"
         f"├─❏ ᴏᴛᴘꜱ ᴛᴏᴅᴀʏ  : {worker_info['otps_today']}\n"
         f"├─❏ ʟᴀꜱᴛ ᴏᴛᴘ    : {worker_info['last_otp']}\n"
         f"├─❏ ɴᴜᴍʙᴇʀꜱ     : {total} ᴛᴏᴛᴀʟ / {avail} ᴀᴠᴀɪʟ\n"
         f"├─❏ ᴜꜱᴇʀꜱ        : {users}\n"
         f"├─❏ ᴏᴛᴘ ʜɪꜱᴛᴏʀʏ  : {otps}\n"
-        f"├─❏ ʟᴏɢɪɴ ᴇʀʀꜱ  : {worker_info['login_errors']}\n"
         f"└─❏"
     )
 
@@ -770,7 +796,15 @@ def solve_captcha(html):
 
 
 class PanelSession:
-    def __init__(self):
+    def __init__(self, base, login_page, signin_url, cdr_url, data_url, username, password, name="panel"):
+        self._base           = base
+        self._login_page     = login_page
+        self._signin_url     = signin_url
+        self._cdr_url        = cdr_url
+        self._data_url       = data_url
+        self._username       = username
+        self._password       = password
+        self._name           = name
         self._session        = None
         self._logged_in      = False
         self._sesskey        = ""
@@ -808,20 +842,20 @@ class PanelSession:
         try:
             sess = await self._get_session()
             async with sess.get(
-                PANEL_CDR_URL,
+                self._cdr_url,
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=15),
                 headers={
-                    "Referer":                  f"{PANEL_BASE}/ints/client/SMSDashboard",
+                    "Referer":                  f"{self._base}/ints/client/SMSDashboard",
                     "Accept":                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
                     "Upgrade-Insecure-Requests": "1",
                 },
             ) as resp:
                 final = str(resp.url)
-                if "/ints/login" in final.lower():
-                    logger.warning("Keepalive: session died, marking for relogin")
+                login_path = self._login_page.split(self._base)[-1].lower()
+                if login_path in final.lower() or "/sign-in" in final.lower():
+                    logger.warning(f"[{self._name}] Keepalive: session died, marking for relogin")
                     self._logged_in         = False
-                    worker_info["logged_in"] = False
                 else:
                     self._last_ping     = now
                     self._last_activity = now
@@ -839,32 +873,32 @@ class PanelSession:
             sess = await self._get_session()
 
             async with sess.get(
-                PANEL_LOGIN_PAGE,
+                self._login_page,
                 allow_redirects=True,
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 if resp.status != 200:
-                    logger.error(f"Login page status: {resp.status}")
+                    logger.error(f"[{self._name}] Login page status: {resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
                 login_html = await resp.text(errors="replace")
 
             capt = solve_captcha(login_html)
-            logger.info(f"Login: capt={capt}")
+            logger.info(f"[{self._name}] Login: capt={capt}")
 
             payload = {
-                "username": PANEL_USERNAME,
-                "password": PANEL_PASSWORD,
+                "username": self._username,
+                "password": self._password,
                 "capt":     capt,
             }
 
             async with sess.post(
-                PANEL_SIGNIN_URL,
+                self._signin_url,
                 data=payload,
                 headers={
-                    "Referer":                  PANEL_LOGIN_PAGE,
-                    "Origin":                   PANEL_BASE,
+                    "Referer":                  self._login_page,
+                    "Origin":                   self._base,
                     "Content-Type":             "application/x-www-form-urlencoded",
                     "Upgrade-Insecure-Requests": "1",
                 },
@@ -872,14 +906,14 @@ class PanelSession:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 location = resp.headers.get("Location", "")
-                logger.info(f"Signin: status={resp.status} location={location}")
+                logger.info(f"[{self._name}] Signin: status={resp.status} location={location}")
                 if resp.status not in (301, 302):
                     logger.error(f"Login not redirected: {resp.status}")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
-                if "/ints/login" in location.lower():
-                    logger.error("Login rejected — redirected back to login")
+                if self._login_page.split(self._base)[-1].lower() in location.lower() or "/sign-in" in location.lower():
+                    logger.error(f"[{self._name}] Login rejected — redirected back to login")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -887,19 +921,20 @@ class PanelSession:
             await asyncio.sleep(1)
 
             async with sess.get(
-                PANEL_CDR_URL,
+                self._cdr_url,
                 allow_redirects=True,
                 headers={
-                    "Referer":                  f"{PANEL_BASE}/ints/client/SMSDashboard",
+                    "Referer":                  f"{self._base}/ints/client/SMSDashboard",
                     "Accept":                   "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
                     "Upgrade-Insecure-Requests": "1",
                 },
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as cdr_resp:
                 cdr_final = str(cdr_resp.url)
-                logger.info(f"CDR after login: status={cdr_resp.status} url={cdr_final}")
-                if "/ints/login" in cdr_final.lower():
-                    logger.error("CDR redirected to login — session not accepted")
+                logger.info(f"[{self._name}] CDR after login: status={cdr_resp.status} url={cdr_final}")
+                login_path = self._login_page.split(self._base)[-1].lower()
+                if login_path in cdr_final.lower() or "/sign-in" in cdr_final.lower():
+                    logger.error(f"[{self._name}] CDR redirected to login — session not accepted")
                     self._login_backoff = min(self._login_backoff * 2, 3600)
                     worker_info["login_errors"] += 1
                     return False
@@ -913,11 +948,11 @@ class PanelSession:
             worker_info["last_login"]   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             worker_info["logged_in"]    = True
             await self._extract_sesskey(cdr_html)
-            logger.info("Panel login OK")
+            logger.info(f"[{self._name}] Panel login OK")
             return True
 
         except Exception as e:
-            logger.error(f"Login exception: {type(e).__name__}: {e}")
+            logger.error(f"[{self._name}] Login exception: {type(e).__name__}: {e}")
             self._login_backoff = min(self._login_backoff * 2, 3600)
             worker_info["login_errors"] += 1
             return False
@@ -934,7 +969,7 @@ class PanelSession:
                 return
         try:
             sess = await self._get_session()
-            async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with sess.get(self._cdr_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 if "/ints/login" in str(resp.url).lower():
                     self._logged_in         = False
                     worker_info["logged_in"] = False
@@ -954,9 +989,10 @@ class PanelSession:
     async def verify_session(self) -> bool:
         try:
             sess = await self._get_session()
-            async with sess.get(PANEL_CDR_URL, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
+            async with sess.get(self._cdr_url, allow_redirects=True, timeout=aiohttp.ClientTimeout(total=20)) as resp:
                 final = str(resp.url)
-                if "/ints/login" in final.lower() or "/login" == final.split(PANEL_BASE)[-1].rstrip("/"):
+                login_path = self._login_page.split(self._base)[-1].lower()
+                if login_path in final.lower() or "/sign-in" in final.lower():
                     self._logged_in         = False
                     worker_info["logged_in"] = False
                     return False
@@ -988,7 +1024,7 @@ class PanelSession:
                 "iColumns":       "7",
                 "sColumns":       "......",
                 "iDisplayStart":  "0",
-                "iDisplayLength": "25",
+                "iDisplayLength": "50",
                 "mDataProp_0":    "0",
                 "sSearch_0":      "",
                 "bRegex_0":       "false",
@@ -1035,10 +1071,10 @@ class PanelSession:
                 params["sesskey"] = self._sesskey
 
             async with sess.get(
-                PANEL_DATA_URL,
+                self._data_url,
                 params=params,
                 headers={
-                    "Referer":          f"{PANEL_BASE}/ints/client/SMSDashboard",
+                    "Referer":          f"{self._base}/ints/client/SMSDashboard",
                     "X-Requested-With": "XMLHttpRequest",
                     "Accept":           "application/json, text/javascript, */*; q=0.01",
                     "Connection":       "keep-alive",
@@ -1047,7 +1083,8 @@ class PanelSession:
                 timeout=aiohttp.ClientTimeout(total=30),
             ) as resp:
                 final = str(resp.url)
-                if "/ints/login" in final.lower():
+                login_path = self._login_page.split(self._base)[-1].lower()
+                if login_path in final.lower() or "/sign-in" in final.lower():
                     self._logged_in         = False
                     worker_info["logged_in"] = False
                     return None, "session_expired"
@@ -1057,7 +1094,7 @@ class PanelSession:
                 try:
                     data = json.loads(text)
                 except Exception:
-                    if "login" in text.lower() and len(text) < 5000:
+                    if ("login" in text.lower() or "sign-in" in text.lower()) and len(text) < 5000:
                         self._logged_in         = False
                         worker_info["logged_in"] = False
                         return None, "session_expired"
@@ -1087,7 +1124,22 @@ class PanelSession:
             await self._session.close()
 
 
-panel = PanelSession()
+panel  = PanelSession(
+    base=PANEL_BASE, login_page=PANEL_LOGIN_PAGE, signin_url=PANEL_SIGNIN_URL,
+    cdr_url=PANEL_CDR_URL, data_url=PANEL_DATA_URL,
+    username=PANEL_USERNAME, password=PANEL_PASSWORD, name="sms hadi"
+)
+panel2 = PanelSession(
+    base=PANEL2_BASE, login_page=PANEL2_LOGIN_PAGE, signin_url=PANEL2_SIGNIN_URL,
+    cdr_url=PANEL2_CDR_URL, data_url=PANEL2_DATA_URL,
+    username=PANEL2_USERNAME, password=PANEL2_PASSWORD, name="nigeria"
+)
+panel3 = PanelSession(
+    base=PANEL3_BASE, login_page=PANEL3_LOGIN_PAGE, signin_url=PANEL3_SIGNIN_URL,
+    cdr_url=PANEL3_CDR_URL, data_url=PANEL3_DATA_URL,
+    username=PANEL3_USERNAME, password=PANEL3_PASSWORD, name="konekta"
+)
+PANELS = [panel, panel2, panel3]
 
 
 async def _watch_membership(app, user_id):
@@ -1110,64 +1162,63 @@ async def _watch_membership(app, user_id):
         pass
 
 
-async def sms_worker(app):
-    if worker_info["running"]:
-        return
-    worker_info["running"] = True
-    last_reset_day         = datetime.now().day
-
+async def _panel_worker(app, p, wi_logged, wi_login, wi_last_login):
+    last_reset_day = datetime.now().day
     while True:
         try:
             today = datetime.now().day
             if today != last_reset_day:
                 worker_info["otps_today"] = 0
-                last_reset_day            = today
+                last_reset_day = today
 
-            if not panel._logged_in:
-                worker_info["logged_in"] = False
-                if not panel._can_attempt_login():
-                    wait = panel._login_backoff - (time.time() - panel._last_login_try)
+            if not p._logged_in:
+                worker_info[wi_logged] = False
+                if not p._can_attempt_login():
+                    wait = p._login_backoff - (time.time() - p._last_login_try)
                     await asyncio.sleep(min(wait, POLL_INTERVAL))
                     continue
 
-                ok = await panel.login()
+                ok = await p.login()
                 if not ok:
-                    if worker_info["login_errors"] == 1:
-                        await notify_admins(app, f"┌─ ᴘᴀɴᴇʟ\n├─❏ ʟᴏɢɪɴ ꜰᴀɪʟᴇᴅ\n└─❏ ʀᴇᴛʀʏɪɴɢ ɪɴ {panel._login_backoff}s")
+                    if worker_info[wi_login] == 1:
+                        await notify_admins(app, f"┌─ [{p._name}]\n├─❏ ʟᴏɢɪɴ ꜰᴀɪʟᴇᴅ\n└─❏ ʀᴇᴛʀʏɪɴɢ ɪɴ {p._login_backoff}s")
                     await asyncio.sleep(POLL_INTERVAL)
                     continue
 
-                worker_info["logged_in"] = True
-                await notify_admins(app, f"┌─ ᴘᴀɴᴇʟ\n├─❏ ʟᴏɢɪɴ ᴏᴋ\n└─❏ {BOT_NAME} ɪꜱ ʟɪᴠᴇ")
+                worker_info[wi_logged]     = True
+                worker_info[wi_last_login] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                worker_info["logged_in"]   = True
+                await notify_admins(app, f"┌─ [{p._name}]\n├─❏ ʟᴏɢɪɴ ᴏᴋ\n└─❏ ʟɪᴠᴇ")
 
-                startup_rows, _ = await panel.fetch_cdr()
+                startup_rows, _ = await p.fetch_cdr()
                 if startup_rows:
                     for r in startup_rows:
                         if not r.get("number") or not r.get("sms"):
                             continue
                         h = hashlib.md5(f"{r['date']}{r['number']}{r['sms']}".encode()).hexdigest()
                         otp_cache.add(h)
-                    logger.info(f"Startup cache: {len(startup_rows)} rows")
+                    logger.info(f"[{p._name}] Startup cache: {len(startup_rows)} rows")
                 continue
 
-            await panel._keepalive_ping()
-
-            if not panel._logged_in:
+            await p._keepalive_ping()
+            if not p._logged_in:
                 continue
 
-            rows, err = await panel.fetch_cdr()
+            rows, err = await p.fetch_cdr()
 
             if err == "session_expired":
-                worker_info["logged_in"] = False
-                await notify_admins(app, "┌─ ᴘᴀɴᴇʟ\n├─❏ ꜱᴇꜱꜱɪᴏɴ ᴇxᴘɪʀᴇᴅ\n└─❏ ʀᴇʟᴏɢɢɪɴɢ...")
+                worker_info[wi_logged] = False
+                await notify_admins(app, f"┌─ [{p._name}]\n├─❏ ꜱᴇꜱꜱɪᴏɴ ᴇxᴘɪʀᴇᴅ\n└─❏ ʀᴇʟᴏɢɢɪɴɢ...")
                 await asyncio.sleep(10)
                 continue
 
             if err:
+                logger.warning(f"[{p._name}] Fetch CDR error: {err}")
                 await asyncio.sleep(POLL_INTERVAL)
                 continue
 
             if rows:
+                logger.info(f"[{p._name}] Fetched {len(rows)} rows from panel")
                 for row in rows:
                     try:
                         sms    = row.get("sms", "").strip()
@@ -1178,10 +1229,9 @@ async def sms_worker(app):
                         clean_num = re.sub(r"\D", "", number)
                         if not clean_num or len(clean_num) < 5:
                             continue
-                        if not re.sub(r"[Xx\s\-_*0]", "", sms):
-                            continue
                         otp = extract_otp(sms)
                         if not otp:
+                            logger.debug(f"[{p._name}] No OTP in: {sms[:60]}")
                             continue
                         h = hashlib.md5(f"{date}{number}{sms}".encode()).hexdigest()
                         if h in otp_cache:
@@ -1190,8 +1240,8 @@ async def sms_worker(app):
                         if existing:
                             otp_cache.add(h)
                             continue
-
-                        text_msg, markup = format_otp_message(row, otp)
+                        logger.info(f"[{p._name}] New OTP: {mask_number(number)} | {otp} — sending")
+                        text_msg, markup = format_otp_message(row, otp, panel_name=p._name)
                         await app.bot.send_message(
                             chat_id=OTP_GROUP_ID,
                             text=text_msg,
@@ -1202,19 +1252,20 @@ async def sms_worker(app):
                         otp_cache.add(h)
                         await db_execute(
                             "INSERT INTO otp_history (hash,number,otp,service,sms,range_name) VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (hash) DO NOTHING",
-                            h, number, otp, row.get("service", ""), sms, row.get("range", ""),
+                            h, number, otp, row.get("service",""), sms, row.get("range",""),
                         )
                         await db_execute(
                             "INSERT INTO traffic (range_name,number,sms,otp,service,received_at) VALUES ($1,$2,$3,$4,$5,$6)",
-                            row.get("range", ""), number, sms, otp, row.get("service", ""), date,
+                            row.get("range",""), number, sms, otp, row.get("service",""), date,
                         )
                         worker_info["last_otp"]    = datetime.now().strftime("%H:%M:%S")
                         worker_info["otps_today"] += 1
-                        logger.info(f"OTP -> group | {mask_number(number)} | {otp}")
-
+                        logger.info(f"[{p._name}] OTP sent -> group | {mask_number(number)} | {otp}")
                     except Exception as row_err:
-                        logger.error(f"Row error: {row_err}")
+                        logger.error(f"[{p._name}] Row error: {row_err}", exc_info=True)
                         continue
+            else:
+                logger.debug(f"[{p._name}] No rows returned")
 
             if len(otp_cache) > 50000:
                 otp_cache.clear()
@@ -1228,9 +1279,19 @@ async def sms_worker(app):
             break
         except Exception as e:
             worker_info["errors"] = worker_info.get("errors", 0) + 1
-            logger.error(f"Worker loop: {e}")
+            logger.error(f"[{p._name}] Worker loop: {e}")
             await asyncio.sleep(15)
 
+
+async def sms_worker(app):
+    if worker_info["running"]:
+        return
+    worker_info["running"] = True
+    await asyncio.gather(
+        _panel_worker(app, panel,  "logged_in",    "login_errors",    "last_login"),
+        _panel_worker(app, panel2, "logged_in_p2", "login_errors_p2", "last_login_p2"),
+        _panel_worker(app, panel3, "logged_in_p3", "login_errors_p3", "last_login_p3"),
+    )
     worker_info["running"] = False
 
 
