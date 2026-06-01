@@ -346,31 +346,70 @@ DEFAULT_SERVICES = [
     "OKX", "Bitget", "Coinbase", "Kraken", "Other",
 ]
 
+SERVICE_ABBREVS = {
+    "whatsapp": "WA", "telegram": "TG", "instagram": "IG", "facebook": "FB",
+    "google": "GG", "tiktok": "TT", "twitter/x": "TW", "twitter": "TW",
+    "snapchat": "SC", "discord": "DC", "line": "LN", "wechat": "WC",
+    "viber": "VB", "signal": "SG", "binance": "BN", "bybit": "BB",
+    "okx": "OK", "bitget": "BG", "coinbase": "CB", "kraken": "KR",
+    "amazon": "AM", "apple": "AP", "microsoft": "MS", "netflix": "NF",
+    "spotify": "SP", "uber": "UB", "paypal": "PP", "stripe": "ST",
+    "other": "OT",
+}
+
+SERVICE_CUSTOM_EMOJI_IDS = {
+    "discord":   "5325612636467903082",
+    "facebook":  "5323261730283863478",
+    "instagram": "5319160079465857105",
+    "line":      "5323608076446613036",
+    "messenger": "5323687726615119535",
+    "signal":    "5325742125436910868",
+    "skype":     "5328064671951896068",
+    "snapchat":  "5327959866159938948",
+    "telegram":  "5330321861949539755",
+    "threads":   "5328050550099427291",
+    "tiktok":    "5328175271654736902",
+    "twitch":    "5334792209940102096",
+    "viber":     "5328242556612395440",
+    "wechat":    "5332449498553663205",
+    "whatsapp":  "5321533581472842536",
+    "twitter":   "5334932883003949665",
+    "twitter/x": "5334932883003949665",
+    "x":         "5334932883003949665",
+    "youtube":   "5346056560537779652",
+    "amazon":    "5346309375197725525",
+    "apple":     "5357184657592962696",
+    "netflix":   "5346134750417403743",
+    "spotify":   "5345967461441223890",
+    "paypal":    "5346259862814734771",
+    "google":    "5359480394922082925",
+    "uber":      "5359772714691216710",
+    "microsoft": "5359437015752401733",
+    "binance":   "5361575381184823162",
+    "bitget":    "5361963895336485277",
+    "kraken":    "5362034259785694259",
+    "stripe":    "5346251367369425932",
+}
+
+BUTTON_ICONS = {
+    "get_number": "", "live_traffic": "", "otp_group": "",
+    "admin": "", "channel": "", "bot": "",
+    "change_number": "", "change_country": "", "back": "",
+    "verify": "", "joined": "", "cancel": "",
+    "add": "", "delete": "", "status": "", "all": "",
+    "copy_otp": "", "copy_sms": "", "stock": "",
+}
+
 def service_abbrev(service: str) -> str:
-    abbrevs = {
-        "whatsapp":   "WA",
-        "telegram":   "TG",
-        "instagram":  "IG",
-        "facebook":   "FB",
-        "google":     "GG",
-        "tiktok":     "TT",
-        "twitter/x":  "TW",
-        "snapchat":   "SC",
-        "discord":    "DC",
-        "line":       "LN",
-        "wechat":     "WC",
-        "viber":      "VB",
-        "signal":     "SG",
-        "binance":    "BN",
-        "bybit":      "BB",
-        "okx":        "OK",
-        "bitget":     "BG",
-        "coinbase":   "CB",
-        "kraken":     "KR",
-        "other":      "OT",
-    }
-    key = service.lower().strip()
-    return abbrevs.get(key, service[:2].upper())
+    key = (service or "").lower().strip()
+    return SERVICE_ABBREVS.get(key, (service or "")[:2].upper() or "OT")
+
+def service_icon(service: str) -> str:
+    key = (service or "").lower().strip()
+    cid = SERVICE_CUSTOM_EMOJI_IDS.get(key)
+    if not cid:
+        return ""
+    return f'<tg-emoji emoji-id="{cid}">📱</tg-emoji>'
 
 def _btn(text, *, cb=None, url=None, style=None, copy=None):
     if copy is not None:
@@ -421,7 +460,7 @@ def otp_markup(otp: str, sms: str):
         ],
         [
             _btn("ᴄʜᴀɴɴᴇʟ", url=MAIN_CHANNEL_LINK, style="primary"),
-            _btn("ʙᴏᴛ",     url=BOT_LINK,           style="primary"),
+            _btn("ʙᴏᴛ",         url=BOT_LINK,           style="primary"),
         ],
     ])
 
@@ -499,7 +538,7 @@ async def build_service_grid():
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(sc(r["service"]), cb=f"gns__{r['service']}", style="success"))
+        row_buf.append(_btn(sc(r['service']), cb=f"gns__{r['service']}", style="success"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
@@ -538,7 +577,7 @@ async def build_delete_service_grid():
     buttons = []
     row_buf = []
     for r in rows:
-        row_buf.append(_btn(sc(r["service"]), cb=f"del_svc__{r['service']}", style="danger"))
+        row_buf.append(_btn(sc(r['service']), cb=f"del_svc__{r['service']}", style="danger"))
         if len(row_buf) == 2:
             buttons.append(row_buf)
             row_buf = []
@@ -684,7 +723,7 @@ async def broadcast_stock(app, country, flag, service, count, numbers_list):
     caption    = (
         f"┌─ ɴᴇᴡ ꜱᴛᴏᴄᴋ ᴀᴅᴅᴇᴅ\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
         f"├─❏ ɴᴜᴍʙᴇʀꜱ  : {count}\n"
         f"└─❏"
     )
@@ -727,7 +766,8 @@ def format_otp_message(row, otp, panel_name=""):
     raw_service      = (row.get("service") or "unknown").strip()
     abbrev           = service_abbrev(raw_service)
 
-    header = f"{flag} #{iso or 'XX'} #{abbrev} {masked}" if flag else f"#{iso or 'XX'} #{abbrev} {masked}"
+    icon   = service_icon(raw_service)
+    header = f"{icon} {flag} #{iso or 'XX'} #{abbrev} {masked}" if flag else f"{icon} #{iso or 'XX'} #{abbrev} {masked}"
     src    = f"\n└─❏ ꜱʀᴄ      : {sc(panel_name)}" if panel_name else "\n└─❏"
 
     text = (
@@ -735,7 +775,7 @@ def format_otp_message(row, otp, panel_name=""):
         f"┌─ ɴᴇᴡ ᴏᴛᴘ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{masked}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : #{abbrev}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {icon} #{abbrev}\n"
         f"├─❏ ᴏᴛᴘ      : <code>{otp}</code>{src}"
     )
     return text, otp_markup(otp, sms_txt)
@@ -746,7 +786,7 @@ def number_display_text(number, country_name, flag, service):
         f"┌─ ɴᴜᴍʙᴇʀ ᴀꜱꜱɪɢɴᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ   : <code>{display}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
         f"└─❏ ᴡᴀɪᴛɪɴɢ ꜰᴏʀ ᴏᴛᴘ..."
     )
 
@@ -756,7 +796,7 @@ def number_changed_text(number, country_name, flag, service):
         f"┌─ ɴᴜᴍʙᴇʀ ᴄʜᴀɴɢᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ   : <code>{display}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
         f"└─❏ ᴡᴀɪᴛɪɴɢ ꜰᴏʀ ᴏᴛᴘ..."
     )
 
@@ -1409,7 +1449,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         recent = await db_fetchall("SELECT number, service, otp, received_at FROM traffic ORDER BY id DESC LIMIT 5")
         lines  = []
         for r in recent:
-            lines.append(f"├─❏ {mask_number(r['number'])} | #{service_abbrev(r['service'] or '')} | <code>{r['otp']}</code>")
+            lines.append(f"├─❏ {service_icon(r['service'] or '')} {mask_number(r['number'])} | #{service_abbrev(r['service'] or '')} | <code>{r['otp']}</code>")
         body = "\n".join(lines) if lines else "├─❏ ɴᴏ ʀᴇᴄᴇɴᴛ ᴛʀᴀꜰꜰɪᴄ"
         text = f"┌─ ʟɪᴠᴇ ᴛʀᴀꜰꜰɪᴄ\n├─❏ ᴛᴏᴛᴀʟ ᴏᴛᴘꜱ : {total}\n{body}\n└─❏"
         await edit_msg(query, text, reply_markup=back_to_menu())
@@ -1421,7 +1461,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not rows:
             await edit_msg(query, "┌─ ꜱᴛᴏᴄᴋ\n├─❏ ɴᴏ ꜱᴛᴏᴄᴋ ᴀᴠᴀɪʟᴀʙʟᴇ\n└─❏", reply_markup=back_to_menu())
             return
-        lines = "\n".join(f"├─❏ {sc(r['service'])} : {r['cnt']}" for r in rows)
+        lines = "\n".join(f"├─❏ {service_icon(r['service'])} {sc(r['service'])} : {r['cnt']}" for r in rows)
         await edit_msg(query, f"┌─ ꜱᴛᴏᴄᴋ\n{lines}\n└─❏", reply_markup=back_to_menu())
         return
 
