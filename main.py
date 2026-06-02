@@ -339,56 +339,174 @@ CHANNEL_LABELS = {
     "@oracron":  ("ᴏʀᴀᴄʀᴏɴ",  FOURTH_CHANNEL_LINK),
 }
 
+SERVICE_FULL_NAMES = {
+    "whatsapp": "WhatsApp", "telegram": "Telegram", "instagram": "Instagram",
+    "facebook": "Facebook", "messenger": "Messenger", "google": "Google",
+    "gmail": "Gmail", "youtube": "YouTube", "tiktok": "TikTok",
+    "twitter": "Twitter", "twitter/x": "Twitter", "x": "Twitter",
+    "snapchat": "Snapchat", "discord": "Discord", "line": "Line",
+    "wechat": "WeChat", "viber": "Viber", "signal": "Signal",
+    "skype": "Skype", "threads": "Threads", "twitch": "Twitch",
+    "kakaotalk": "KakaoTalk", "kakao": "KakaoTalk", "zalo": "Zalo",
+    "imo": "imo", "tinder": "Tinder", "bumble": "Bumble", "hinge": "Hinge",
+    "badoo": "Badoo", "grindr": "Grindr", "okcupid": "OkCupid", "match": "Match",
+    "linkedin": "LinkedIn", "pinterest": "Pinterest", "reddit": "Reddit",
+    "tumblr": "Tumblr", "vk": "VK", "ok": "OK.ru", "weibo": "Weibo", "qq": "QQ",
+    "binance": "Binance", "bybit": "Bybit", "okx": "OKX", "bitget": "Bitget",
+    "coinbase": "Coinbase", "kraken": "Kraken", "kucoin": "KuCoin",
+    "huobi": "Huobi", "htx": "HTX", "mexc": "MEXC", "gateio": "Gate.io",
+    "gate": "Gate.io", "bitfinex": "Bitfinex", "crypto.com": "Crypto.com",
+    "cryptocom": "Crypto.com", "blockchain": "Blockchain",
+    "amazon": "Amazon", "apple": "Apple", "microsoft": "Microsoft",
+    "netflix": "Netflix", "spotify": "Spotify", "uber": "Uber", "lyft": "Lyft",
+    "bolt": "Bolt", "didi": "DiDi", "olacabs": "Ola", "ola": "Ola",
+    "grab": "Grab", "doordash": "DoorDash", "ubereats": "Uber Eats",
+    "deliveroo": "Deliveroo", "glovo": "Glovo", "wolt": "Wolt",
+    "paypal": "PayPal", "stripe": "Stripe", "venmo": "Venmo", "zelle": "Zelle",
+    "cashapp": "Cash App", "wise": "Wise", "revolut": "Revolut", "n26": "N26",
+    "monzo": "Monzo", "chime": "Chime", "robinhood": "Robinhood",
+    "etrade": "E*Trade", "fidelity": "Fidelity", "schwab": "Schwab",
+    "westernunion": "Western Union", "moneygram": "MoneyGram",
+    "remitly": "Remitly", "paysafe": "Paysafecard", "skrill": "Skrill",
+    "neteller": "Neteller", "payoneer": "Payoneer", "alipay": "Alipay",
+    "wechatpay": "WeChat Pay", "googlepay": "Google Pay", "applepay": "Apple Pay",
+    "samsungpay": "Samsung Pay", "mpesa": "M-Pesa", "klarna": "Klarna",
+    "afterpay": "Afterpay", "affirm": "Affirm",
+    "ebay": "eBay", "etsy": "Etsy", "shopee": "Shopee", "lazada": "Lazada",
+    "aliexpress": "AliExpress", "alibaba": "Alibaba", "wish": "Wish",
+    "temu": "Temu", "shein": "Shein", "mercadolibre": "Mercado Libre",
+    "olx": "OLX", "wallapop": "Wallapop", "depop": "Depop",
+    "vinted": "Vinted", "craigslist": "Craigslist", "kijiji": "Kijiji",
+    "booking": "Booking", "airbnb": "Airbnb", "agoda": "Agoda",
+    "expedia": "Expedia", "trip": "Trip.com", "skyscanner": "Skyscanner",
+    "hotels": "Hotels.com", "kayak": "Kayak", "trivago": "Trivago",
+    "tripadvisor": "TripAdvisor", "vrbo": "Vrbo",
+    "steam": "Steam", "epic": "Epic Games", "epicgames": "Epic Games",
+    "playstation": "PlayStation", "psn": "PlayStation", "xbox": "Xbox",
+    "nintendo": "Nintendo", "ea": "EA", "origin": "Origin", "ubisoft": "Ubisoft",
+    "riot": "Riot Games", "blizzard": "Blizzard", "battlenet": "Battle.net",
+    "roblox": "Roblox", "minecraft": "Minecraft", "supercell": "Supercell",
+    "pubg": "PUBG", "fortnite": "Fortnite", "valorant": "Valorant",
+    "mihoyo": "miHoYo", "hoyoverse": "HoYoverse", "genshin": "Genshin Impact",
+    "github": "GitHub", "gitlab": "GitLab", "bitbucket": "Bitbucket",
+    "stackoverflow": "Stack Overflow", "openai": "OpenAI", "chatgpt": "ChatGPT",
+    "anthropic": "Anthropic", "claude": "Claude", "gemini": "Gemini",
+    "huggingface": "Hugging Face", "midjourney": "Midjourney",
+    "notion": "Notion", "slack": "Slack", "zoom": "Zoom", "teams": "MS Teams",
+    "webex": "Webex", "skype": "Skype", "trello": "Trello", "asana": "Asana",
+    "monday": "Monday", "clickup": "ClickUp", "jira": "Jira",
+    "dropbox": "Dropbox", "drive": "Google Drive", "onedrive": "OneDrive",
+    "box": "Box", "icloud": "iCloud", "mega": "MEGA",
+    "yandex": "Yandex", "mail.ru": "Mail.ru", "mailru": "Mail.ru",
+    "outlook": "Outlook", "hotmail": "Hotmail", "yahoo": "Yahoo",
+    "protonmail": "ProtonMail", "proton": "Proton", "tutanota": "Tuta",
+    "discord": "Discord", "guilded": "Guilded", "matrix": "Matrix",
+    "telegram_x": "Telegram X", "session": "Session", "wickr": "Wickr",
+    "bluesky": "Bluesky", "mastodon": "Mastodon", "truthsocial": "Truth Social",
+    "parler": "Parler", "gettr": "Gettr", "rumble": "Rumble", "kick": "Kick",
+    "onlyfans": "OnlyFans", "fansly": "Fansly", "patreon": "Patreon",
+    "fiverr": "Fiverr", "upwork": "Upwork", "freelancer": "Freelancer",
+    "indeed": "Indeed", "glassdoor": "Glassdoor", "ziprecruiter": "ZipRecruiter",
+    "doordash": "DoorDash", "instacart": "Instacart", "postmates": "Postmates",
+    "walmart": "Walmart", "target": "Target", "costco": "Costco",
+    "bestbuy": "Best Buy", "homedepot": "Home Depot", "wayfair": "Wayfair",
+    "ikea": "IKEA", "zara": "Zara", "hm": "H&M", "nike": "Nike",
+    "adidas": "Adidas", "puma": "Puma", "underarmour": "Under Armour",
+    "starbucks": "Starbucks", "mcdonalds": "McDonald's", "kfc": "KFC",
+    "burgerking": "Burger King", "dominos": "Domino's", "pizzahut": "Pizza Hut",
+    "subway": "Subway", "chipotle": "Chipotle", "wendys": "Wendy's",
+    "duolingo": "Duolingo", "babbel": "Babbel", "rosettastone": "Rosetta Stone",
+    "coursera": "Coursera", "udemy": "Udemy", "khanacademy": "Khan Academy",
+    "edx": "edX", "skillshare": "Skillshare", "lingoda": "Lingoda",
+    "other": "Other",
+}
+
 DEFAULT_SERVICES = [
     "WhatsApp", "Telegram", "Instagram", "Facebook", "Google",
-    "TikTok", "Twitter/X", "Snapchat", "Discord", "Line",
-    "WeChat", "Viber", "Signal", "Binance", "Bybit",
-    "OKX", "Bitget", "Coinbase", "Kraken", "Other",
+    "TikTok", "Twitter", "Snapchat", "Discord", "Line",
+    "WeChat", "Viber", "Signal", "Skype", "Messenger",
+    "Threads", "Twitch", "YouTube", "Binance", "Bybit",
+    "OKX", "Bitget", "Coinbase", "Kraken", "Stripe",
+    "PayPal", "Amazon", "Apple", "Microsoft", "Netflix",
+    "Spotify", "Uber", "Other",
 ]
 
-SERVICE_ABBREVS = {
+def _abbrev_from_name(name: str) -> str:
+    s = re.sub(r"[^A-Za-z0-9]", "", name or "")
+    if not s:
+        return "OT"
+    return s[:2].upper()
+
+_ABBREV_OVERRIDES = {
     "whatsapp": "WA", "telegram": "TG", "instagram": "IG", "facebook": "FB",
-    "google": "GG", "tiktok": "TT", "twitter/x": "TW", "twitter": "TW",
+    "messenger": "MS", "google": "GG", "gmail": "GM", "youtube": "YT",
+    "tiktok": "TT", "twitter": "TW", "twitter/x": "TW", "x": "TW",
     "snapchat": "SC", "discord": "DC", "line": "LN", "wechat": "WC",
-    "viber": "VB", "signal": "SG", "binance": "BN", "bybit": "BB",
-    "okx": "OK", "bitget": "BG", "coinbase": "CB", "kraken": "KR",
-    "amazon": "AM", "apple": "AP", "microsoft": "MS", "netflix": "NF",
-    "spotify": "SP", "uber": "UB", "paypal": "PP", "stripe": "ST",
+    "viber": "VB", "signal": "SG", "skype": "SK", "threads": "TH",
+    "twitch": "TC", "kakaotalk": "KK", "zalo": "ZL", "imo": "IM",
+    "linkedin": "LI", "pinterest": "PT", "reddit": "RD", "tumblr": "TM",
+    "vk": "VK", "weibo": "WB", "qq": "QQ",
+    "binance": "BN", "bybit": "BB", "okx": "OK", "bitget": "BG",
+    "coinbase": "CB", "kraken": "KR", "kucoin": "KC", "mexc": "MX",
+    "gateio": "GT", "gate": "GT", "huobi": "HB", "htx": "HX",
+    "crypto.com": "CR", "cryptocom": "CR",
+    "amazon": "AM", "apple": "AP", "microsoft": "MC", "netflix": "NF",
+    "spotify": "SP", "uber": "UB", "lyft": "LY", "bolt": "BL",
+    "paypal": "PP", "stripe": "ST", "venmo": "VN", "cashapp": "CA",
+    "wise": "WS", "revolut": "RV", "skrill": "SR", "payoneer": "PY",
+    "alipay": "AL", "mpesa": "MP", "klarna": "KL",
+    "ebay": "EB", "etsy": "ET", "shopee": "SH", "lazada": "LZ",
+    "aliexpress": "AE", "alibaba": "AB", "temu": "TE", "shein": "SI",
+    "booking": "BK", "airbnb": "AI", "agoda": "AG", "expedia": "EX",
+    "steam": "SM", "epic": "EP", "epicgames": "EP", "playstation": "PS",
+    "xbox": "XB", "nintendo": "NT", "roblox": "RB", "minecraft": "MN",
+    "github": "GH", "gitlab": "GL", "openai": "OA", "chatgpt": "GP",
+    "claude": "CL", "gemini": "GE", "notion": "NO", "slack": "SL",
+    "zoom": "ZM", "teams": "TS", "trello": "TR", "asana": "AS",
+    "dropbox": "DB", "drive": "DR", "onedrive": "OD", "icloud": "IC",
+    "mega": "MG", "yandex": "YX", "outlook": "OL", "yahoo": "YH",
+    "proton": "PR", "protonmail": "PR",
+    "bluesky": "BS", "mastodon": "MD", "kick": "KI", "rumble": "RM",
+    "onlyfans": "OF", "patreon": "PA", "fiverr": "FV", "upwork": "UP",
+    "tinder": "TD", "bumble": "BM", "hinge": "HG", "badoo": "BD",
+    "duolingo": "DL", "coursera": "CO", "udemy": "UD",
     "other": "OT",
 }
 
+SERVICE_ABBREVS = {k: _ABBREV_OVERRIDES.get(k, _abbrev_from_name(v)) for k, v in SERVICE_FULL_NAMES.items()}
+
 SERVICE_CUSTOM_EMOJI_IDS = {
-    "discord":   "5325612636467903082",
-    "facebook":  "5323261730283863478",
-    "instagram": "5319160079465857105",
-    "line":      "5323608076446613036",
-    "messenger": "5323687726615119535",
-    "signal":    "5325742125436910868",
-    "skype":     "5328064671951896068",
-    "snapchat":  "5327959866159938948",
-    "telegram":  "5330321861949539755",
-    "threads":   "5328050550099427291",
-    "tiktok":    "5328175271654736902",
-    "twitch":    "5334792209940102096",
-    "viber":     "5328242556612395440",
-    "wechat":    "5332449498553663205",
-    "whatsapp":  "5321533581472842536",
-    "twitter":   "5334932883003949665",
-    "twitter/x": "5334932883003949665",
-    "x":         "5334932883003949665",
-    "youtube":   "5346056560537779652",
-    "amazon":    "5346309375197725525",
-    "apple":     "5357184657592962696",
-    "netflix":   "5346134750417403743",
-    "spotify":   "5345967461441223890",
-    "paypal":    "5346259862814734771",
-    "google":    "5359480394922082925",
-    "uber":      "5359772714691216710",
-    "microsoft": "5359437015752401733",
-    "binance":   "5361575381184823162",
-    "bitget":    "5361963895336485277",
-    "kraken":    "5362034259785694259",
-    "stripe":    "5346251367369425932",
+    "discord":     "5325612636467903082",
+    "facebook":    "5323261730283863478",
+    "instagram":   "5319160079465857105",
+    "line":        "5323608076446613036",
+    "messenger":   "5323687726615119535",
+    "signal":      "5325742125436910868",
+    "skype":       "5328064671951896068",
+    "snapchat":    "5327959866159938948",
+    "telegram":    "5330321861949539755",
+    "threads":     "5328050550099427291",
+    "tiktok":      "5328175271654736902",
+    "twitch":      "5334792209940102096",
+    "viber":       "5328242556612395440",
+    "wechat":      "5332449498553663205",
+    "whatsapp":    "5321533581472842536",
+    "twitter":     "5334932883003949665",
+    "twitter/x":   "5334932883003949665",
+    "x":           "5334932883003949665",
+    "youtube":     "5346056560537779652",
+    "amazon":      "5346309375197725525",
+    "apple":       "5357184657592962696",
+    "netflix":     "5346134750417403743",
+    "spotify":     "5345967461441223890",
+    "paypal":      "5346259862814734771",
+    "google":      "5359480394922082925",
+    "uber":        "5359772714691216710",
+    "microsoft":   "5359437015752401733",
+    "binance":     "5361575381184823162",
+    "bitget":      "5361963895336485277",
+    "kraken":      "5362034259785694259",
+    "stripe":      "5346251367369425932",
 }
 
 BUTTON_ICONS = {
@@ -400,16 +518,38 @@ BUTTON_ICONS = {
     "copy_otp": "", "copy_sms": "", "stock": "",
 }
 
+def _norm_service(service: str) -> str:
+    return re.sub(r"\s+", "", (service or "").lower().strip())
+
+def service_full_name(service: str) -> str:
+    key = (service or "").lower().strip()
+    if key in SERVICE_FULL_NAMES:
+        return SERVICE_FULL_NAMES[key]
+    nk = _norm_service(service)
+    if nk in SERVICE_FULL_NAMES:
+        return SERVICE_FULL_NAMES[nk]
+    return (service or "Other").strip().title()
+
+def service_tag(service: str) -> str:
+    name = service_full_name(service)
+    return "#" + re.sub(r"[^A-Za-z0-9]", "", name) if name else "#Other"
+
 def service_abbrev(service: str) -> str:
     key = (service or "").lower().strip()
-    return SERVICE_ABBREVS.get(key, (service or "")[:2].upper() or "OT")
+    if key in SERVICE_ABBREVS:
+        return SERVICE_ABBREVS[key]
+    nk = _norm_service(service)
+    if nk in SERVICE_ABBREVS:
+        return SERVICE_ABBREVS[nk]
+    return _abbrev_from_name(service)
 
 def service_icon(service: str) -> str:
     key = (service or "").lower().strip()
-    cid = SERVICE_CUSTOM_EMOJI_IDS.get(key)
+    cid = SERVICE_CUSTOM_EMOJI_IDS.get(key) or SERVICE_CUSTOM_EMOJI_IDS.get(_norm_service(service))
     if not cid:
         return ""
     return f'<tg-emoji emoji-id="{cid}">📱</tg-emoji>'
+
 
 def _btn(text, *, cb=None, url=None, style=None, copy=None):
     if copy is not None:
@@ -723,7 +863,7 @@ async def broadcast_stock(app, country, flag, service, count, numbers_list):
     caption    = (
         f"┌─ ɴᴇᴡ ꜱᴛᴏᴄᴋ ᴀᴅᴅᴇᴅ\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {service_full_name(service)}\n"
         f"├─❏ ɴᴜᴍʙᴇʀꜱ  : {count}\n"
         f"└─❏"
     )
@@ -765,19 +905,23 @@ def format_otp_message(row, otp, panel_name=""):
     sms_txt          = (row.get("sms") or "").strip()
     raw_service      = (row.get("service") or "unknown").strip()
     abbrev           = service_abbrev(raw_service)
+    full_name        = service_full_name(raw_service)
+    tag              = service_tag(raw_service)
 
     icon   = service_icon(raw_service)
-    header = f"{icon} {flag} #{iso or 'XX'} #{abbrev} {masked}" if flag else f"{icon} #{iso or 'XX'} #{abbrev} {masked}"
+    header = f"{flag} #{iso or 'XX'} {icon} <code>{masked}</code>".strip() if flag else f"#{iso or 'XX'} {icon} <code>{masked}</code>".strip()
     src    = f"\n└─❏ ꜱʀᴄ      : {sc(panel_name)}" if panel_name else "\n└─❏"
 
     text = (
         f"<b>{header}</b>\n"
+        f"{tag}\n"
         f"┌─ ɴᴇᴡ ᴏᴛᴘ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{masked}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {icon} #{abbrev}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {icon} {tag}\n"
         f"├─❏ ᴏᴛᴘ      : <code>{otp}</code>{src}"
     )
+
     return text, otp_markup(otp, sms_txt)
 
 def number_display_text(number, country_name, flag, service):
@@ -786,7 +930,7 @@ def number_display_text(number, country_name, flag, service):
         f"┌─ ɴᴜᴍʙᴇʀ ᴀꜱꜱɪɢɴᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ   : <code>{display}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {service_full_name(service)}\n"
         f"└─❏ ᴡᴀɪᴛɪɴɢ ꜰᴏʀ ᴏᴛᴘ..."
     )
 
@@ -796,7 +940,7 @@ def number_changed_text(number, country_name, flag, service):
         f"┌─ ɴᴜᴍʙᴇʀ ᴄʜᴀɴɢᴇᴅ\n"
         f"├─❏ ɴᴜᴍʙᴇʀ   : <code>{display}</code>\n"
         f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {sc(service)}\n"
+        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {service_icon(service)} {service_full_name(service)}\n"
         f"└─❏ ᴡᴀɪᴛɪɴɢ ꜰᴏʀ ᴏᴛᴘ..."
     )
 
@@ -1449,7 +1593,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         recent = await db_fetchall("SELECT number, service, otp, received_at FROM traffic ORDER BY id DESC LIMIT 5")
         lines  = []
         for r in recent:
-            lines.append(f"├─❏ {service_icon(r['service'] or '')} {mask_number(r['number'])} | #{service_abbrev(r['service'] or '')} | <code>{r['otp']}</code>")
+            lines.append(f"├─❏ {service_icon(r['service'] or '')} {mask_number(r['number'])} | {service_tag(r['service'] or '')} | <code>{r['otp']}</code>")
+
         body = "\n".join(lines) if lines else "├─❏ ɴᴏ ʀᴇᴄᴇɴᴛ ᴛʀᴀꜰꜰɪᴄ"
         text = f"┌─ ʟɪᴠᴇ ᴛʀᴀꜰꜰɪᴄ\n├─❏ ᴛᴏᴛᴀʟ ᴏᴛᴘꜱ : {total}\n{body}\n└─❏"
         await edit_msg(query, text, reply_markup=back_to_menu())
@@ -1461,7 +1606,8 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not rows:
             await edit_msg(query, "┌─ ꜱᴛᴏᴄᴋ\n├─❏ ɴᴏ ꜱᴛᴏᴄᴋ ᴀᴠᴀɪʟᴀʙʟᴇ\n└─❏", reply_markup=back_to_menu())
             return
-        lines = "\n".join(f"├─❏ {service_icon(r['service'])} {sc(r['service'])} : {r['cnt']}" for r in rows)
+        lines = "\n".join(f"├─❏ {service_icon(r['service'])} {service_full_name(r['service'])} : {r['cnt']}" for r in rows)
+
         await edit_msg(query, f"┌─ ꜱᴛᴏᴄᴋ\n{lines}\n└─❏", reply_markup=back_to_menu())
         return
 
