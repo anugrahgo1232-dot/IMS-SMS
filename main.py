@@ -37,9 +37,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
-BOT_TOKEN           = "8313925262:AAFWhXOIG5edYgZPtcsVDUEDyPfNTdWLBWw"
+BOT_TOKEN           = "8917876068:AAHdDleh4hd57wEXJ8YArAGKPvJSGHHBYN0"
 BOT_NAME            = "ᴍʀ.ᴀғʀɪx"
-BOT_LINK            = "https://t.me/mrafrix_bot"
+BOT_LINK            = "https://t.me/oracron_bot"
 BASE_ADMIN_IDS      = [8339856952, 6524840104]
 
 PANEL_BASE          = "http://139.99.69.196"
