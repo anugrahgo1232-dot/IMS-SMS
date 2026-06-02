@@ -84,15 +84,15 @@ PANEL5_PASSWORD     = "jadendev"
 
 MAIN_CHANNEL        = "@sage_xd"
 MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
-BACKUP_CHANNEL      = "@mr_afrix"
-BACKUP_CHANNEL_LINK = "https://t.me/mr_afrix"
+BACKUP_CHANNEL      = "@mr_afrixx"
+BACKUP_CHANNEL_LINK = "https://t.me/mr_afrixx"
 THIRD_CHANNEL       = "@oxellabs"
 THIRD_CHANNEL_LINK  = "https://t.me/oxellabs"
 FOURTH_CHANNEL      = "@oracron"
 FOURTH_CHANNEL_LINK = "https://t.me/oracron"
 OTP_GROUP_LINK      = "https://t.me/afrixotpgc"
 OTP_GROUP_ID        = -1003053441379
-FORCE_CHANNELS      = ["@sage_xd", "@mr_afrix", "@oxellabs", "@oracron"]
+FORCE_CHANNELS      = ["@sage_xd", "@mr_afrixx", "@oxellabs", "@oracron"]
 
 DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
