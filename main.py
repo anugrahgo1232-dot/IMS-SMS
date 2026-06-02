@@ -37,9 +37,9 @@ from telegram.ext import (
     ContextTypes,
 )
 
-BOT_TOKEN           = "8917876068:AAHdDleh4hd57wEXJ8YArAGKPvJSGHHBYN0"
+BOT_TOKEN           = "8313925262:AAFWhXOIG5edYgZPtcsVDUEDyPfNTdWLBWw"
 BOT_NAME            = "ᴍʀ.ᴀғʀɪx"
-BOT_LINK            = "https://t.me/oracron_bot"
+BOT_LINK            = "https://t.me/mrafrix_bot"
 BASE_ADMIN_IDS      = [8339856952, 6524840104]
 
 PANEL_BASE          = "http://139.99.69.196"
@@ -73,6 +73,14 @@ PANEL4_CDR_URL      = f"{PANEL4_BASE}/ints/client/SMSCDRStats"
 PANEL4_DATA_URL     = f"{PANEL4_BASE}/ints/client/res/data_smscdr.php"
 PANEL4_USERNAME     = "Malik0"
 PANEL4_PASSWORD     = "Malik0"
+
+PANEL5_BASE         = "http://139.99.68.231"
+PANEL5_LOGIN_PAGE   = f"{PANEL5_BASE}/ints/login"
+PANEL5_SIGNIN_URL   = f"{PANEL5_BASE}/ints/signin"
+PANEL5_CDR_URL      = f"{PANEL5_BASE}/ints/client/SMSCDRStats"
+PANEL5_DATA_URL     = f"{PANEL5_BASE}/ints/client/res/data_smscdr.php"
+PANEL5_USERNAME     = "jadendev"
+PANEL5_PASSWORD     = "jadendev"
 
 MAIN_CHANNEL        = "@sage_xd"
 MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
@@ -119,17 +127,20 @@ worker_info = {
     "logged_in_p2":    False,
     "logged_in_p3":    False,
     "logged_in_p4":    False,
+    "logged_in_p5":    False,
     "last_otp":        "—",
     "otps_today":      0,
     "last_login":      "—",
     "last_login_p2":   "—",
     "last_login_p3":   "—",
     "last_login_p4":   "—",
+    "last_login_p5":   "—",
     "errors":          0,
     "login_errors":    0,
     "login_errors_p2": 0,
     "login_errors_p3": 0,
     "login_errors_p4": 0,
+    "login_errors_p5": 0,
     "started_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
@@ -956,12 +967,14 @@ async def status_text():
     p2_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p2"] else "ᴏꜰꜰʟɪɴᴇ"
     p3_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p3"] else "ᴏꜰꜰʟɪɴᴇ"
     p4_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p4"] else "ᴏꜰꜰʟɪɴᴇ"
+    p5_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p5"] else "ᴏꜰꜰʟɪɴᴇ"
     return (
         f"┌─ ꜱᴛᴀᴛᴜꜱ\n"
         f"├─❏ ᴢʏʀᴏɴ        : {p4_stat} | {worker_info['last_login_p4']}\n"
         f"├─❏ ꜱᴍꜱ ʜᴀᴅɪ    : {p1_stat} | {worker_info['last_login']}\n"
         f"├─❏ ɴɪɢᴇʀɪᴀ      : {p2_stat} | {worker_info['last_login_p2']}\n"
         f"├─❏ ᴋᴏɴᴇᴋᴛᴀ      : {p3_stat} | {worker_info['last_login_p3']}\n"
+        f"├─❏ ᴄᴏʀᴇ ꜱᴍꜱ     : {p5_stat} | {worker_info['last_login_p5']}\n"
         f"├─❏ ᴏᴛᴘꜱ ᴛᴏᴅᴀʏ  : {worker_info['otps_today']}\n"
         f"├─❏ ʟᴀꜱᴛ ᴏᴛᴘ    : {worker_info['last_otp']}\n"
         f"├─❏ ɴᴜᴍʙᴇʀꜱ     : {total} ᴛᴏᴛᴀʟ / {avail} ᴀᴠᴀɪʟ\n"
@@ -1350,7 +1363,13 @@ panel4 = PanelSession(
     username=PANEL4_USERNAME, password=PANEL4_PASSWORD, name="zyron",
     wi_logged="logged_in_p4", wi_login="login_errors_p4", wi_last_login="last_login_p4",
 )
-PANELS = [panel4, panel, panel2, panel3]
+panel5 = PanelSession(
+    base=PANEL5_BASE, login_page=PANEL5_LOGIN_PAGE, signin_url=PANEL5_SIGNIN_URL,
+    cdr_url=PANEL5_CDR_URL, data_url=PANEL5_DATA_URL,
+    username=PANEL5_USERNAME, password=PANEL5_PASSWORD, name="core sms",
+    wi_logged="logged_in_p5", wi_login="login_errors_p5", wi_last_login="last_login_p5",
+)
+PANELS = [panel4, panel, panel2, panel3, panel5]
 
 
 async def _watch_membership(app, user_id):
@@ -1502,6 +1521,7 @@ async def sms_worker(app):
         _panel_worker(app, panel2, "logged_in_p2", "login_errors_p2", "last_login_p2"),
         _panel_worker(app, panel3, "logged_in_p3", "login_errors_p3", "last_login_p3"),
         _panel_worker(app, panel4, "logged_in_p4", "login_errors_p4", "last_login_p4"),
+        _panel_worker(app, panel5, "logged_in_p5", "login_errors_p5", "last_login_p5"),
     )
     worker_info["running"] = False
 
@@ -1989,6 +2009,10 @@ async def health_handler(request):
             "bot":          BOT_NAME,
             "worker":       worker_info["running"],
             "logged_in":    worker_info["logged_in"],
+            "logged_in_p2": worker_info["logged_in_p2"],
+            "logged_in_p3": worker_info["logged_in_p3"],
+            "logged_in_p4": worker_info["logged_in_p4"],
+            "logged_in_p5": worker_info["logged_in_p5"],
             "otps_today":   worker_info["otps_today"],
             "last_otp":     worker_info["last_otp"],
             "login_errors": worker_info["login_errors"],
