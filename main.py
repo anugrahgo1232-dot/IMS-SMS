@@ -38,7 +38,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN           = "8518029747:AAEmh89aY2yfX1w6b8Y5405Z-rahgRi3DJI"
-BOT_NAME            = "OracBot"
+BOT_NAME            = "Oracotp"
 BOT_LINK            = "https://t.me/oracotp_bot"
 BASE_ADMIN_IDS      = [8339856952, 6524840104]
 
@@ -74,25 +74,13 @@ PANEL4_DATA_URL     = f"{PANEL4_BASE}/ints/client/res/data_smscdr.php"
 PANEL4_USERNAME     = "Malik0"
 PANEL4_PASSWORD     = "Malik0"
 
-PANEL5_BASE         = "http://139.99.68.231"
-PANEL5_LOGIN_PAGE   = f"{PANEL5_BASE}/ints/login"
-PANEL5_SIGNIN_URL   = f"{PANEL5_BASE}/ints/signin"
-PANEL5_CDR_URL      = f"{PANEL5_BASE}/ints/client/SMSCDRStats"
-PANEL5_DATA_URL     = f"{PANEL5_BASE}/ints/client/res/data_smscdr.php"
-PANEL5_USERNAME     = "jadendev"
-PANEL5_PASSWORD     = "jadendev"
-
-MAIN_CHANNEL        = "@sage_xd"
-MAIN_CHANNEL_LINK   = "https://t.me/sage_xd"
-BACKUP_CHANNEL      = "@mr_afrixx"
-BACKUP_CHANNEL_LINK = "https://t.me/mr_afrixx"
-THIRD_CHANNEL       = "@oxellabs"
-THIRD_CHANNEL_LINK  = "https://t.me/oxellabs"
-FOURTH_CHANNEL      = "@oracron"
-FOURTH_CHANNEL_LINK = "https://t.me/oracron"
+MAIN_CHANNEL        = "@oracron"
+MAIN_CHANNEL_LINK   = "https://t.me/oracron"
+BACKUP_CHANNEL      = "@oracbott"
+BACKUP_CHANNEL_LINK = "https://t.me/oracbott"
 OTP_GROUP_LINK      = "https://t.me/afrixotpgc"
 OTP_GROUP_ID        = -1003053441379
-FORCE_CHANNELS      = ["@sage_xd", "@mr_afrixx", "@oxellabs", "@oracron"]
+FORCE_CHANNELS      = ["@oracron", "@oracbott"]
 
 DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
@@ -127,20 +115,17 @@ worker_info = {
     "logged_in_p2":    False,
     "logged_in_p3":    False,
     "logged_in_p4":    False,
-    "logged_in_p5":    False,
     "last_otp":        "—",
     "otps_today":      0,
     "last_login":      "—",
     "last_login_p2":   "—",
     "last_login_p3":   "—",
     "last_login_p4":   "—",
-    "last_login_p5":   "—",
     "errors":          0,
     "login_errors":    0,
     "login_errors_p2": 0,
     "login_errors_p3": 0,
     "login_errors_p4": 0,
-    "login_errors_p5": 0,
     "started_at":      datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
@@ -154,7 +139,12 @@ def sc(t: str) -> str:
 
 def iso_to_flag(iso: str) -> str:
     try:
-        return "".join(chr(ord(c) + 127397) for c in iso.upper()[:2])
+        code = (iso or "").upper()[:2]
+        cid  = COUNTRY_CUSTOM_EMOJI_IDS.get(code)
+        unicode_flag = "".join(chr(ord(c) + 127397) for c in code)
+        if cid:
+            return f'<tg-emoji emoji-id="{cid}">{unicode_flag}</tg-emoji>'
+        return unicode_flag
     except Exception:
         return ""
 
@@ -344,10 +334,8 @@ async def set_setting(key, value):
     )
 
 CHANNEL_LABELS = {
-    "@sage_xd":  ("ꜱᴀɢᴇ",    MAIN_CHANNEL_LINK),
-    "@mr_afrix": ("ᴍʀᴀꜰʀɪx",  BACKUP_CHANNEL_LINK),
-    "@oxellabs": ("ᴏxᴇʟʟᴀʙꜱ", THIRD_CHANNEL_LINK),
-    "@oracron":  ("ᴏʀᴀᴄʀᴏɴ",  FOURTH_CHANNEL_LINK),
+    "@oracron":  ("ᴏʀᴀᴄʀᴏɴ",  MAIN_CHANNEL_LINK),
+    "@oracbott": ("ᴏʀᴀᴄ ʙᴏᴛ", BACKUP_CHANNEL_LINK),
 }
 
 SERVICE_FULL_NAMES = {
@@ -512,12 +500,211 @@ SERVICE_CUSTOM_EMOJI_IDS = {
     "spotify":     "5345967461441223890",
     "paypal":      "5346259862814734771",
     "google":      "5359480394922082925",
+    "gmail":       "5359480394922082925",
+    "googlevoice": "5359480394922082925",
+    "googleads":   "5359480394922082925",
+    "googlepay":   "5359480394922082925",
+    "googleplay":  "5359480394922082925",
     "uber":        "5359772714691216710",
+    "ubereats":    "5359772714691216710",
     "microsoft":   "5359437015752401733",
+    "outlook":     "5359437015752401733",
+    "hotmail":     "5359437015752401733",
+    "xbox":        "5359437015752401733",
+    "live":        "5359437015752401733",
     "binance":     "5361575381184823162",
     "bitget":      "5361963895336485277",
     "kraken":      "5362034259785694259",
     "stripe":      "5346251367369425932",
+}
+
+COUNTRY_CUSTOM_EMOJI_IDS = {
+    "AD": "5221987861733061751",
+    "AE": "5224565851427976312",
+    "AF": "5222096009009575868",
+    "AG": "5224544866217765554",
+    "AL": "5224312057515486246",
+    "AM": "5224369957969603463",
+    "AO": "5224379767674907895",
+    "AR": "5221980461504411710",
+    "AT": "5224520754271366661",
+    "AU": "5224659803837574114",
+    "AZ": "5224426544163728284",
+    "BA": "5224496092569155254",
+    "BB": "5222156533688712094",
+    "BD": "5224407289825340729",
+    "BE": "5224513182244024630",
+    "BF": "5222356541725749790",
+    "BG": "5222092074819530668",
+    "BH": "5224492892818518587",
+    "BI": "5224490444687158452",
+    "BJ": "5222024115552009151",
+    "BM": "5222482143749353810",
+    "BN": "5224435958732042406",
+    "BO": "5224675484763170798",
+    "BR": "5224688610183228070",
+    "BS": "5224504167107668172",
+    "BT": "5224541065171710147",
+    "BW": "5224288456670196085",
+    "BY": "5280820319458707404",
+    "BZ": "5224316292353241916",
+    "CA": "5222001124592071204",
+    "CD": "5224398158724871677",
+    "CF": "5222073662294733523",
+    "CG": "5222104268231684600",
+    "CH": "5224707263226194753",
+    "CL": "5222350726340032308",
+    "CM": "5222270788408717651",
+    "CN": "5224435456220868088",
+    "CO": "5224455152940886669",
+    "CR": "5222453801260168022",
+    "CV": "5222347737042792258",
+    "CY": "5222431454545327055",
+    "CZ": "5222073533445714675",
+    "DE": "5222165617544542414",
+    "DJ": "5224203012590810589",
+    "DK": "5222297215342490217",
+    "DM": "5222337489250824921",
+    "DO": "5224286412265763450",
+    "DZ": "5224260376174015500",
+    "EC": "5224191188545840926",
+    "EE": "5222195463272281351",
+    "EG": "5222161185138292290",
+    "ES": "5222024776976970940",
+    "ET": "5224467805914542024",
+    "EU": "5222108911091331711",
+    "FI": "5224282903277482188",
+    "FJ": "5221962676044838178",
+    "FM": "5222280486444873367",
+    "FO": "5280985770188885026",
+    "FR": "5222029789203804982",
+    "GA": "5224669733801963467",
+    "GB": "5224518800061245598",
+    "GD": "5222234560359577687",
+    "GE": "5222152195771742239",
+    "GH": "5224511339703056124",
+    "GM": "5221949872747330159",
+    "GN": "5222337588035073000",
+    "GQ": "5222172811614762423",
+    "GR": "5222463490706389920",
+    "GT": "5222128302868672826",
+    "GW": "5224705704153066489",
+    "GY": "5224570532942329532",
+    "HN": "5222229234600130045",
+    "HR": "5221967765581085099",
+    "HT": "5224683146984831315",
+    "HU": "5224691998912427164",
+    "ID": "5224405893960969756",
+    "IE": "5224257017509588818",
+    "IL": "5224720599099648709",
+    "IN": "5222300011366200403",
+    "IQ": "5221980268230882832",
+    "IR": "5224374154152653367",
+    "IS": "5222063229819172521",
+    "IT": "5222460101977190141",
+    "JM": "5222007034467074185",
+    "JO": "5222292177345853436",
+    "JP": "5222390089715299207",
+    "KE": "5222089648163009103",
+    "KG": "5224388147156102493",
+    "KH": "5224189882875785448",
+    "KI": "5224652244695134610",
+    "KM": "5222398735484466247",
+    "KR": "5222345550904439270",
+    "KW": "5221949726718442491",
+    "KZ": "5222276376161171525",
+    "LA": "5224200843632324642",
+    "LB": "5222244425899455269",
+    "LC": "5222000927023577045",
+    "LK": "5224277294050192388",
+    "LR": "5221998371518034740",
+    "LS": "5224245850594619415",
+    "LT": "5224245902134226386",
+    "LU": "5224499567197700690",
+    "LV": "5224401229626484931",
+    "LY": "5222194286451242896",
+    "MA": "5224530035695693965",
+    "MC": "5221937224068640464",
+    "MD": "5224216473018314447",
+    "ME": "5224463399278096980",
+    "MG": "5222042605386217334",
+    "MH": "5224538449536624503",
+    "MK": "5222470435668505656",
+    "ML": "5224322352552096671",
+    "MN": "5224192257992701543",
+    "MQ": "5281027792148909351",
+    "MT": "5224731388057497620",
+    "MU": "5224238347286752315",
+    "MV": "5224393700548814960",
+    "MX": "5221971386238514431",
+    "MY": "5224312886444174057",
+    "MZ": "5222470388423864826",
+    "NA": "5224690826386351746",
+    "NE": "5222099049846420864",
+    "NG": "5224723614166691638",
+    "NL": "5224516489368841614",
+    "NO": "5224465228934163949",
+    "NP": "5222444378101925267",
+    "NZ": "5224573595254009705",
+    "OM": "5222396686785066306",
+    "PA": "5222111719999945107",
+    "PE": "5224482026551258766",
+    "PG": "5224500164198149905",
+    "PH": "5222065042295376892",
+    "PK": "5224637061985742245",
+    "PL": "5224670399521892983",
+    "PR": "5224220115150582423",
+    "PS": "5222041677673282461",
+    "PT": "5224404094369672274",
+    "PY": "5222152565138929235",
+    "QA": "5222225596762830469",
+    "RO": "5222273794885826118",
+    "RS": "5222145396838512729",
+    "RU": "5280582975270963511",
+    "RW": "5222449197055227754",
+    "SA": "5224698145010624573",
+    "SB": "5222290588207954120",
+    "SC": "5224467496676896871",
+    "SD": "5224372990216514135",
+    "SE": "5222201098269373561",
+    "SG": "5224194023224257181",
+    "SI": "5224660718665607511",
+    "SK": "5222401879400528047",
+    "SL": "5224420995065983217",
+    "SN": "5224358988623130949",
+    "SO": "5222370504664428325",
+    "SR": "5224567367551428669",
+    "SS": "5224618146949773268",
+    "ST": "5221953304426198315",
+    "SV": "5224337131534559907",
+    "SZ": "5224269666188274723",
+    "TD": "5222060468155204001",
+    "TG": "5222408051268532030",
+    "TH": "5224638530864556281",
+    "TJ": "5222217865821696536",
+    "TL": "5224515905253291409",
+    "TM": "5224256935905208951",
+    "TN": "5221991375016310330",
+    "TR": "5224601903383457698",
+    "TT": "5224391883777651050",
+    "TZ": "5224397364155923150",
+    "UA": "5222250679371839695",
+    "UG": "5222464040462200940",
+    "UN": "5451772687993031127",
+    "US": "5224321781321442532",
+    "UY": "5222466849370813232",
+    "UZ": "5222404546575219535",
+    "VA": "5222420266155520507",
+    "VC": "5224541228380467535",
+    "VI": "5224395882392201810",
+    "VN": "5222359651282071925",
+    "VU": "5222126748090512778",
+    "WS": "5224660353593387686",
+    "XK": "5222197129719592160",
+    "YE": "5222300655611294950",
+    "ZA": "5224696216570309138",
+    "ZM": "5224646626877911277",
+    "ZW": "5222060442385397848",
 }
 
 BUTTON_ICONS = {
@@ -606,8 +793,8 @@ def main_menu_markup(user_id=None):
 def otp_markup(otp: str, sms: str):
     return _markup([
         [
-            _btn("ᴄᴏᴘʏ ᴏᴛᴘ",      copy=otp,  style="success"),
-            _btn("ᴄᴏᴘʏ ꜰᴜʟʟ ꜱᴍꜱ", copy=sms,  style="primary"),
+            _btn(str(otp),         copy=otp, style="success"),
+            _btn("ᴄᴏᴘʏ ꜰᴜʟʟ ꜱᴍꜱ", copy=sms, style="primary"),
         ],
         [
             _btn("ᴄʜᴀɴɴᴇʟ", url=MAIN_CHANNEL_LINK, style="primary"),
@@ -639,7 +826,10 @@ def admin_markup():
             _btn("ᴀᴅᴅ ɴᴜᴍʙᴇʀꜱ",    cb="adm_add_numbers",    style="success"),
             _btn("ᴅᴇʟᴇᴛᴇ ɴᴜᴍʙᴇʀꜱ", cb="adm_delete_numbers", style="danger"),
         ],
-        [_btn("ꜱᴛᴀᴛᴜꜱ",  cb="adm_status",  style="primary")],
+        [
+            _btn("ʙʀᴏᴀᴅᴄᴀꜱᴛ", cb="adm_broadcast", style="success"),
+            _btn("ꜱᴛᴀᴛᴜꜱ",   cb="adm_status",    style="primary"),
+        ],
         [_btn("ʙᴀᴄᴋ",    cb="menu_back",   style="danger")],
     ])
 
@@ -912,27 +1102,16 @@ def format_otp_message(row, otp, panel_name=""):
     clean            = re.sub(r"\D", "", str(row["number"]))
     _, iso, cname, _ = parse_phone(clean)
     flag             = iso_to_flag(iso) if iso else ""
-    country_name     = cname if cname else "unknown"
     sms_txt          = (row.get("sms") or "").strip()
     raw_service      = (row.get("service") or "unknown").strip()
     abbrev           = service_abbrev(raw_service)
-    full_name        = service_full_name(raw_service)
     tag              = service_tag(raw_service)
+    icon             = service_icon(raw_service)
 
-    icon   = service_icon(raw_service)
-    header = f"{flag} #{iso or 'XX'} {icon} <code>{masked}</code>".strip() if flag else f"#{iso or 'XX'} {icon} <code>{masked}</code>".strip()
-    src    = f"\n└─❏ ꜱʀᴄ      : {sc(panel_name)}" if panel_name else "\n└─❏"
+    head_bits = [p for p in [flag, f"#{iso}" if iso else "", f"#{abbrev}" if abbrev else "", icon, f"<code>{masked}</code>"] if p]
+    header = " ".join(head_bits)
 
-    text = (
-        f"<b>{header}</b>\n"
-        f"{tag}\n"
-        f"┌─ ɴᴇᴡ ᴏᴛᴘ\n"
-        f"├─❏ ɴᴜᴍʙᴇʀ  : <code>{masked}</code>\n"
-        f"├─❏ ᴄᴏᴜɴᴛʀʏ  : {flag} {sc(country_name)}\n"
-        f"├─❏ ꜱᴇʀᴠɪᴄᴇ  : {icon} {tag}\n"
-        f"├─❏ ᴏᴛᴘ      : <code>{otp}</code>{src}"
-    )
-
+    text = f"<b>{header}</b>\n\n{tag}"
     return text, otp_markup(otp, sms_txt)
 
 def number_display_text(number, country_name, flag, service):
@@ -967,14 +1146,12 @@ async def status_text():
     p2_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p2"] else "ᴏꜰꜰʟɪɴᴇ"
     p3_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p3"] else "ᴏꜰꜰʟɪɴᴇ"
     p4_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p4"] else "ᴏꜰꜰʟɪɴᴇ"
-    p5_stat = "ᴏɴʟɪɴᴇ" if worker_info["logged_in_p5"] else "ᴏꜰꜰʟɪɴᴇ"
     return (
         f"┌─ ꜱᴛᴀᴛᴜꜱ\n"
         f"├─❏ ᴢʏʀᴏɴ        : {p4_stat} | {worker_info['last_login_p4']}\n"
         f"├─❏ ꜱᴍꜱ ʜᴀᴅɪ    : {p1_stat} | {worker_info['last_login']}\n"
         f"├─❏ ɴɪɢᴇʀɪᴀ      : {p2_stat} | {worker_info['last_login_p2']}\n"
         f"├─❏ ᴋᴏɴᴇᴋᴛᴀ      : {p3_stat} | {worker_info['last_login_p3']}\n"
-        f"├─❏ ᴄᴏʀᴇ ꜱᴍꜱ     : {p5_stat} | {worker_info['last_login_p5']}\n"
         f"├─❏ ᴏᴛᴘꜱ ᴛᴏᴅᴀʏ  : {worker_info['otps_today']}\n"
         f"├─❏ ʟᴀꜱᴛ ᴏᴛᴘ    : {worker_info['last_otp']}\n"
         f"├─❏ ɴᴜᴍʙᴇʀꜱ     : {total} ᴛᴏᴛᴀʟ / {avail} ᴀᴠᴀɪʟ\n"
@@ -1363,13 +1540,7 @@ panel4 = PanelSession(
     username=PANEL4_USERNAME, password=PANEL4_PASSWORD, name="zyron",
     wi_logged="logged_in_p4", wi_login="login_errors_p4", wi_last_login="last_login_p4",
 )
-panel5 = PanelSession(
-    base=PANEL5_BASE, login_page=PANEL5_LOGIN_PAGE, signin_url=PANEL5_SIGNIN_URL,
-    cdr_url=PANEL5_CDR_URL, data_url=PANEL5_DATA_URL,
-    username=PANEL5_USERNAME, password=PANEL5_PASSWORD, name="core sms",
-    wi_logged="logged_in_p5", wi_login="login_errors_p5", wi_last_login="last_login_p5",
-)
-PANELS = [panel4, panel, panel2, panel3, panel5]
+PANELS = [panel4, panel, panel2, panel3]
 
 
 async def _watch_membership(app, user_id):
@@ -1521,7 +1692,6 @@ async def sms_worker(app):
         _panel_worker(app, panel2, "logged_in_p2", "login_errors_p2", "last_login_p2"),
         _panel_worker(app, panel3, "logged_in_p3", "login_errors_p3", "last_login_p3"),
         _panel_worker(app, panel4, "logged_in_p4", "login_errors_p4", "last_login_p4"),
-        _panel_worker(app, panel5, "logged_in_p5", "login_errors_p5", "last_login_p5"),
     )
     worker_info["running"] = False
 
@@ -1748,6 +1918,15 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await edit_msg(query, "ᴄᴀɴᴄᴇʟʟᴇᴅ.", reply_markup=admin_markup())
         return
 
+    if data == "adm_broadcast":
+        USER_STATE[user.id] = "ADM_BROADCAST_WAIT"
+        await edit_msg(
+            query,
+            "┌─ ʙʀᴏᴀᴅᴄᴀꜱᴛ\n├─❏ ꜱᴇɴᴅ ᴀ ᴍᴇꜱꜱᴀɢᴇ ᴏʀ ᴘʜᴏᴛᴏ ᴛᴏ ꜰᴏʀᴡᴀʀᴅ ᴛᴏ ᴀʟʟ ᴜꜱᴇʀꜱ\n└─❏",
+            reply_markup=cancel_state_markup("adm_back"),
+        )
+        return
+
     if data == "adm_status":
         await edit_msg(query, await status_text(), reply_markup=back_to_admin())
         return
@@ -1875,6 +2054,42 @@ async def _insert_numbers_bulk(service: str, result: dict):
     return total_added, total_dupes, by_country
 
 
+async def _do_broadcast(app, text=None, photo=None, caption=None):
+    rows = await db_fetchall("SELECT user_id FROM users WHERE is_banned=FALSE")
+    sent = 0
+    failed = 0
+    for r in rows:
+        uid = r["user_id"]
+        try:
+            if photo:
+                await app.bot.send_photo(chat_id=uid, photo=photo, caption=caption or "", parse_mode=ParseMode.HTML)
+            else:
+                await app.bot.send_message(chat_id=uid, text=text or "", parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+            sent += 1
+            await asyncio.sleep(0.04)
+        except Exception:
+            failed += 1
+    return sent, failed
+
+
+async def photo_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    if not is_admin(user.id):
+        return
+    if USER_STATE.get(user.id) != "ADM_BROADCAST_WAIT":
+        return
+    USER_STATE.pop(user.id, None)
+    photo   = update.message.photo[-1].file_id
+    caption = (update.message.caption or "").strip()
+    sent, failed = await _do_broadcast(context.application, text=None, photo=photo, caption=caption)
+    await send_msg(
+        context.bot, update.effective_chat.id,
+        f"┌─ ʙʀᴏᴀᴅᴄᴀꜱᴛ ꜱᴇɴᴛ\n├─❏ ᴅᴇʟɪᴠᴇʀᴇᴅ : {sent}\n├─❏ ꜰᴀɪʟᴇᴅ    : {failed}\n└─❏",
+        reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]]),
+    )
+
+
+
 async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     text = (update.message.text or "").strip()
@@ -1890,6 +2105,16 @@ async def text_input_handler(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     state = USER_STATE.get(user.id)
     if not state:
+        return
+
+    if state == "ADM_BROADCAST_WAIT":
+        USER_STATE.pop(user.id, None)
+        sent, failed = await _do_broadcast(context.application, text=text, photo=None, caption=None)
+        await send_msg(
+            context.bot, update.effective_chat.id,
+            f"┌─ ʙʀᴏᴀᴅᴄᴀꜱᴛ ꜱᴇɴᴛ\n├─❏ ᴅᴇʟɪᴠᴇʀᴇᴅ : {sent}\n├─❏ ꜰᴀɪʟᴇᴅ    : {failed}\n└─❏",
+            reply_markup=_markup([[_btn("ʙᴀᴄᴋ", cb="adm_back", style="danger")]]),
+        )
         return
 
     if state == "ADM_CUSTOM_SVC":
@@ -2009,10 +2234,6 @@ async def health_handler(request):
             "bot":          BOT_NAME,
             "worker":       worker_info["running"],
             "logged_in":    worker_info["logged_in"],
-            "logged_in_p2": worker_info["logged_in_p2"],
-            "logged_in_p3": worker_info["logged_in_p3"],
-            "logged_in_p4": worker_info["logged_in_p4"],
-            "logged_in_p5": worker_info["logged_in_p5"],
             "otps_today":   worker_info["otps_today"],
             "last_otp":     worker_info["last_otp"],
             "login_errors": worker_info["login_errors"],
@@ -2072,6 +2293,7 @@ if __name__ == "__main__":
     application.add_handler(CommandHandler("cancel", cancel_cmd))
     application.add_handler(CallbackQueryHandler(handle_callback))
     application.add_handler(MessageHandler(filters.Document.ALL, document_handler))
+    application.add_handler(MessageHandler(filters.PHOTO, photo_input_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_input_handler))
 
     logger.info(f"Starting {BOT_NAME}...")
