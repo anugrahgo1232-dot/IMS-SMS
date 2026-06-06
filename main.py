@@ -37,10 +37,10 @@ from telegram.ext import (
     ContextTypes,
 )
 
-BOT_TOKEN           = "8518029747:AAEmh89aY2yfX1w6b8Y5405Z-rahgRi3DJI"
-BOT_NAME            = "Oracotp"
-BOT_LINK            = "https://t.me/oracotp_bot"
-BASE_ADMIN_IDS      = [8339856952, 6524840104]
+BOT_TOKEN           = "8649162840:AAF0yZS9RX3RRy_flzDLOi3w8w4jgka8kec"
+BOT_NAME            = "xyekezz otp"
+BOT_LINK            = "https://t.me/+5dXNh2a7tr5mNDA1"
+BASE_ADMIN_IDS      = [8525945799]
 
 PANEL_BASE          = "http://139.99.69.196"
 PANEL_LOGIN_PAGE    = f"{PANEL_BASE}/ints/login"
@@ -74,13 +74,13 @@ PANEL4_DATA_URL     = f"{PANEL4_BASE}/ints/client/res/data_smscdr.php"
 PANEL4_USERNAME     = "Malik0"
 PANEL4_PASSWORD     = "Malik0"
 
-MAIN_CHANNEL        = "@oracron"
-MAIN_CHANNEL_LINK   = "https://t.me/oracron"
-BACKUP_CHANNEL      = "@oracbott"
-BACKUP_CHANNEL_LINK = "https://t.me/oracbott"
-OTP_GROUP_LINK      = "https://t.me/afrixotpgc"
-OTP_GROUP_ID        = -1003053441379
-FORCE_CHANNELS      = ["@oracron", "@oracbott"]
+MAIN_CHANNEL        = "@xyekezz otp"
+MAIN_CHANNEL_LINK   = "https://t.me/+5dXNh2a7tr5mNDA1"
+BACKUP_CHANNEL      = "@xykess file"
+BACKUP_CHANNEL_LINK = "https://t.me/adakanmi"
+OTP_GROUP_LINK      = "https://t.me/+5dXNh2a7tr5mNDA1"
+OTP_GROUP_ID        = -1003914110525
+FORCE_CHANNELS      = ["@xyekes file", "@xyekezz otp"]
 
 DATABASE_URL        = "postgresql://neondb_owner:npg_ocasy6rIX2vR@ep-cold-darkness-ak558puk.c-3.us-west-2.aws.neon.tech/neondb?sslmode=require"
 PORT                = int(os.environ.get("PORT", 8080))
